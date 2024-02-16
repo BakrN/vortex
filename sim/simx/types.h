@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -61,15 +61,17 @@ enum class RegType {
   None,
   Integer,
   Float,
-  Vector
+  Vector,
+  TC // Small tile matrix buffer inside core
 };
 
 inline std::ostream &operator<<(std::ostream &os, const RegType& type) {
   switch (type) {
   case RegType::None: break;
-  case RegType::Integer: os << "x"; break;  
+  case RegType::Integer: os << "x"; break;
   case RegType::Float:   os << "f"; break;
   case RegType::Vector:  os << "v"; break;
+  case RegType::TC:      os << "t"; break;
   }
   return os;
 }
@@ -82,6 +84,7 @@ enum class ExeType {
   FPU,
   SFU,
   MAX,
+  TC
 };
 
 inline std::ostream &operator<<(std::ostream &os, const ExeType& type) {
@@ -91,6 +94,7 @@ inline std::ostream &operator<<(std::ostream &os, const ExeType& type) {
   case ExeType::FPU: os << "FPU"; break;
   case ExeType::SFU: os << "SFU"; break;
   case ExeType::MAX: break;
+  case ExeType::TC:  os << "TC"; break;
   }
   return os;
 }
@@ -190,7 +194,7 @@ enum class SfuType {
   CSRRW,
   CSRRS,
   CSRRC,
-  CMOV  
+  CMOV
 };
 
 inline std::ostream &operator<<(std::ostream &os, const SfuType& type) {
@@ -231,13 +235,13 @@ struct MemReq {
   bool write;
   AddrType type;
   uint32_t tag;
-  uint32_t cid;    
+  uint32_t cid;
   uint64_t uuid;
 
-  MemReq(uint64_t _addr = 0, 
+  MemReq(uint64_t _addr = 0,
           bool _write = false,
           AddrType _type = AddrType::Global,
-          uint64_t _tag = 0, 
+          uint64_t _tag = 0,
           uint32_t _cid = 0,
           uint64_t _uuid = 0
   ) : addr(_addr)
@@ -260,12 +264,12 @@ inline std::ostream &operator<<(std::ostream &os, const MemReq& req) {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct MemRsp {
-  uint64_t tag;    
+  uint64_t tag;
   uint32_t cid;
   uint64_t uuid;
-  
+
   MemRsp(uint64_t _tag = 0, uint32_t _cid = 0, uint64_t _uuid = 0)
-    : tag (_tag) 
+    : tag (_tag)
     , cid(_cid)
     , uuid(_uuid)
   {}
@@ -281,16 +285,16 @@ inline std::ostream &operator<<(std::ostream &os, const MemRsp& rsp) {
 
 template <typename T>
 class HashTable {
-public:    
+public:
   HashTable(uint32_t capacity)
     : entries_(capacity)
-    , size_(0) 
+    , size_(0)
   {}
 
   bool empty() const {
     return (0 == size_);
   }
-  
+
   bool full() const {
     return (size_ == entries_.size());
   }
@@ -321,7 +325,7 @@ public:
       if (!entry.first) {
         entry.first = true;
         entry.second = value;
-        ++size_;              
+        ++size_;
         return i;
       }
     }
@@ -357,28 +361,28 @@ public:
   std::vector<SimPort<Req>>  ReqIn;
   std::vector<SimPort<Rsp>>  RspIn;
 
-  std::vector<SimPort<Req>>  ReqOut;  
+  std::vector<SimPort<Req>>  ReqOut;
   std::vector<SimPort<Rsp>>  RspOut;
 
   Switch(
-    const SimContext& ctx, 
-    const char* name, 
-    ArbiterType type, 
-    uint32_t num_inputs = 1, 
+    const SimContext& ctx,
+    const char* name,
+    ArbiterType type,
+    uint32_t num_inputs = 1,
     uint32_t num_outputs = 1,
     uint32_t delay = 1
-  ) 
-    : SimObject<Switch<Req, Rsp>>(ctx, name)    
+  )
+    : SimObject<Switch<Req, Rsp>>(ctx, name)
     , ReqIn(num_inputs,   this)
     , RspIn(num_inputs,   this)
-    , ReqOut(num_outputs, this)    
+    , ReqOut(num_outputs, this)
     , RspOut(num_outputs, this)
     , type_(type)
     , delay_(delay)
     , cursors_(num_outputs, 0)
     , lg_num_reqs_(log2ceil(num_inputs / num_outputs))
   {
-    assert(delay != 0);    
+    assert(delay != 0);
     assert(num_inputs <= 32);
     assert(num_outputs <= 32);
     assert(num_inputs >= num_outputs);
@@ -406,15 +410,15 @@ public:
     // skip bypass mode
     if (I == O)
       return;
-        
-    // process incomming requests        
+
+    // process incomming requests
     for (uint32_t o = 0; o < O; ++o) {
       for (uint32_t r = 0; r < R; ++r) {
         uint32_t i = (cursors_.at(o) + r) & (R-1);
         uint32_t j = o * R + i;
         if (j >= I)
           continue;
-        
+
         auto& req_in = ReqIn.at(j);
         if (!req_in.empty()) {
           auto& req = req_in.front();
@@ -422,13 +426,13 @@ public:
             req.tag = (req.tag << lg_num_reqs_) | i;
           }
           DT(4, this->name() << "-" << req);
-          ReqOut.at(o).send(req, delay_);                
+          ReqOut.at(o).send(req, delay_);
           req_in.pop();
           this->update_cursor(o, i);
           break;
         }
       }
-      
+
       // process incoming reponses
       if (!RspOut.at(o).empty()) {
         auto& rsp = RspOut.at(o).front();
@@ -436,10 +440,10 @@ public:
         if (lg_num_reqs_ != 0) {
           i = rsp.tag & (R-1);
           rsp.tag >>= lg_num_reqs_;
-        }      
+        }
         DT(4, this->name() << "-" << rsp);
         uint32_t j = o * R + i;
-        RspIn.at(j).send(rsp, 1);      
+        RspIn.at(j).send(rsp, 1);
         RspOut.at(o).pop();
       }
     }
@@ -453,7 +457,7 @@ public:
 
 private:
   ArbiterType type_;
-  uint32_t delay_;  
+  uint32_t delay_;
   std::vector<uint32_t> cursors_;
   uint32_t lg_num_reqs_;
 };
@@ -472,10 +476,10 @@ public:
   SimPort<MemRsp>  RspDc;
 
   SMemDemux(
-    const SimContext& ctx, 
-    const char* name, 
+    const SimContext& ctx,
+    const char* name,
     uint32_t delay = 1
-  ) : SimObject<SMemDemux>(ctx, name)    
+  ) : SimObject<SMemDemux>(ctx, name)
     , ReqIn(this)
     , RspIn(this)
     , ReqSm(this)
@@ -488,7 +492,7 @@ public:
   void reset() {}
 
   void tick() {
-    // process incomming requests  
+    // process incomming requests
     if (!ReqIn.empty()) {
       auto& req = ReqIn.front();
       DT(4, this->name() << "-" << req);
@@ -498,8 +502,8 @@ public:
         ReqDc.send(req, delay_);
       }
       ReqIn.pop();
-    }   
-      
+    }
+
     // process incoming reponses
     if (!RspSm.empty()) {
       auto& rsp = RspSm.front();
