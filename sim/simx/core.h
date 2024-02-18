@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -38,6 +38,7 @@
 #include "exe_unit.h"
 #include "dcrs.h"
 
+class TensorCore;
 namespace vortex {
 
 class Cluster;
@@ -59,7 +60,7 @@ public:
     uint64_t ifetch_latency;
     uint64_t load_latency;
 
-    PerfStats() 
+    PerfStats()
       : cycles(0)
       , instrs(0)
       , ibuf_stalls(0)
@@ -82,10 +83,10 @@ public:
   std::vector<SimPort<MemReq>> dcache_req_ports;
   std::vector<SimPort<MemRsp>> dcache_rsp_ports;
 
-  Core(const SimContext& ctx, 
-       uint32_t core_id, 
+  Core(const SimContext& ctx,
+       uint32_t core_id,
        Cluster* cluster,
-       const Arch &arch, 
+       const Arch &arch,
        const DCRS &dcrs,
        SharedMem::Ptr  sharedmem);
 
@@ -114,11 +115,11 @@ public:
   }
 
   uint32_t get_csr(uint32_t addr, uint32_t tid, uint32_t wid);
-  
+
   void set_csr(uint32_t addr, uint32_t value, uint32_t tid, uint32_t wid);
 
   void wspawn(uint32_t num_warps, Word nextPC);
-  
+
   void barrier(uint32_t bar_id, uint32_t count, uint32_t warp_id);
 
   AddrType get_addr_type(uint64_t addr);
@@ -139,7 +140,10 @@ public:
 
   bool check_exit(Word* exitcode, bool riscv_test) const;
 
+
+
 private:
+
 
   void schedule();
   void fetch();
@@ -147,7 +151,7 @@ private:
   void issue();
   void execute();
   void commit();
-  
+
   void writeToStdOut(const void* data, uint64_t addr, uint32_t size);
 
   void cout_flush();
@@ -155,11 +159,11 @@ private:
   uint32_t core_id_;
   const Arch& arch_;
   const DCRS &dcrs_;
-  
+
   const Decoder decoder_;
   MemoryUnit mmu_;
 
-  std::vector<std::shared_ptr<Warp>> warps_;  
+  std::vector<std::shared_ptr<Warp>> warps_;
   std::vector<WarpMask> barriers_;
   std::vector<Byte> fcsrs_;
   std::vector<IBuffer> ibuffers_;
@@ -171,7 +175,7 @@ private:
 
   PipelineLatch fetch_latch_;
   PipelineLatch decode_latch_;
-  
+
   HashTable<pipeline_trace_t*> pending_icache_;
   std::vector<pipeline_trace_t*> committed_traces_;
   WarpMask active_warps_;
@@ -185,9 +189,9 @@ private:
   std::unordered_map<int, std::stringstream> print_bufs_;
 
   std::vector<std::vector<CSRs>> csrs_;
-  
+
   PerfStats perf_stats_;
-  
+
   Cluster* cluster_;
 
   uint32_t commit_exe_;
@@ -197,6 +201,7 @@ private:
   friend class AluUnit;
   friend class FpuUnit;
   friend class SfuUnit;
+  friend class ::TensorCore;
 };
 
 } // namespace vortex

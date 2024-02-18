@@ -77,6 +77,7 @@ public:
     AluType  alu_type;
     FpuType  fpu_type;
     SfuType  sfu_type;
+    TCOpType  tc_type;
   };
 
   ITraceData::Ptr data;
