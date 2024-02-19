@@ -1,2 +1,0 @@
-main.o: main.cpp /home/projects/vortex/runtime/include/vortex.h \
- /home/projects/vortex/kernel/../hw/VX_config.h common.h

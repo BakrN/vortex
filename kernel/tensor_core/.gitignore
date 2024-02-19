@@ -1,0 +1,87 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+*.bin
+*.dump
+*.elf
+
+*.depend
+*.o
+*.pocl
+*.codecov*
+*.yml
+*.so
+*/objdir/*
+
+# Tests
+*conform/conform
+*fibonacci/fibonacci
+*hello/hello
+# Opencl 
+*opencl/blackscholes/blackscholes
+*opencl/cutcp/cutcp
+*opencl/dotproduct/dotproduct
+*opencl/gaussian/gaussian
+*opencl/kmeans/kmeans
+*opencl/lbm/lbm
+*opencl/matmul/matmul
+*opencl/mri-q/mri-q
+*opencl/nearn/nearn
+*opencl/oclprintf/oclprintf
+*opencl/psort/psort
+*opencl/saxpy/saxpy
+*opencl/sfilter/sfilter
+*opencl/sgemm/sgemm
+*opencl/spmv/spmv
+*opencl/stencil/stencil
+*opencl/transpose/transpose
+*opencl/vecadd/vecadd
+*opencl/vectorhypot/vectorhypot
+
+#regression
+*regression/basic/basic
+*regression/demo/demo
+*regression/diverge/diverge
+*regression/dogfood/dogfood
+*regression/fence/fence
+*regression/io_addr/io_addr
+*regression/mstress/mstress
+*regression/no_mf_ext/no_mf_ext
+*regression/no_smem/no_smem
+*regression/printf/printf
+*regression/sort/sort
+
+
+# KERNEL
+*/vx_malloc/vx_malloc
+*.pocl
