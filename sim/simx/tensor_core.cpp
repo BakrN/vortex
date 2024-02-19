@@ -1,6 +1,7 @@
 #include "tensor_core.h"
 #include "pipeline.h"
 #include "core.h"
+#include <numeric>
 
 
 PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t acc_buf_rows, size_t acc_buf_cols, size_t output_fifo_size, size_t num_acc_tiles) :
@@ -17,31 +18,28 @@ PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth
 void PEGroup::loadMatA(const std::vector<uint16_t>& data){
     for (auto& e: data)
         m_mat_a.insert(e);
-    updateRdyToFire();
 }
 
 void PEGroup::loadMatB( const std::vector<uint16_t>& data){
     for (auto& e: data)
         m_mat_b.insert(e);
-    updateRdyToFire();
 }
 
 void PEGroup::loadAccBuf(const std::vector<uint32_t>& data) {
     for (auto& e: data)
         m_mat_c.insert(e);
-    updateRdyToFire();
 }
-void PEGroup::insertOutput(size_t pe_id, uint16_t reg, uint32_t val){
-    m_output_fifo[pe_id].push(std::make_pair(reg, val));
+void PEGroup::insertOutput(size_t pe_id,uint32_t warp_id,  uint16_t reg, uint32_t val){
+    m_output_fifo[pe_id].push(std::make_tuple(warp_id,reg, val));
 }
-std::pair<uint16_t, uint32_t> PEGroup::popOutput(size_t pe_id){
+std::tuple<uint32_t , uint16_t, uint32_t> PEGroup::popOutput(size_t pe_id){
     return m_output_fifo[pe_id].pop();
 }
 void PEGroup::popOperands() {
-    m_mat_a.pop();
-    m_mat_b.pop();
-    m_mat_c.pop();
-    updateRdyToFire();
+    m_mat_a.popRow();
+    m_mat_b.popRow();
+    m_mat_c.popRow();
+    m_cur_step = 0 ;
 }
 
 void PEGroup::setAccMat(size_t row, size_t col, uint32_t data){
@@ -59,12 +57,7 @@ TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t confi
         m_pe_groups.push_back(PEGroup(config.num_pes, config.operand_count, config.input_mat_buf_depth, config.acc_buf_rows, config.acc_buf_cols, config.output_fifo_size, config.num_acc_tiles));
 }
 
-void TensorCore::tick() {
-    // FOR NOW I ASSUME PARALLEL LOADING (all pe groups are loaded at same time so only need to look at 1 group) (assumption 1)
-    // Ensure all threads are synchronized before doing MMA instruction
-
-
-
+void TensorCore::handleInput(){
     for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
         // Handle inputs
         bool recieved_input = false;
@@ -86,14 +79,16 @@ void TensorCore::tick() {
             // sync check call per thread
             for (auto i = 0 ; i < MAX_NUM_THREADS; i++ ) {
                 if (!tmask[i]) {
-                    if (i != MAX_NUM_THREADS-1) {
-                        throw std::runtime_error("Threads not synchronized");
+                    if (i != MAX_NUM_THREADS-1) { // how to check if last thread is not synced?
+                        if (tmask[i+1]) {
+                            throw std::runtime_error("Threads not synchronized");
+                        }
                     }
                 }
             }
             #endif
 
-            for (auto t = 0 ; t < trace->tmask.count() ; t++) {
+            for (size_t t = 0 ; t < trace->tmask.count() ; t++) {
                 std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
                 std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
                 uint32_t c ;
@@ -137,12 +132,11 @@ void TensorCore::tick() {
                     }
                     if (c_index == -1) {
                         // use mat accumulate buffer
-                        auto row = 0;
+                        auto row = 0; // row is dependent on tid
                         auto col = 1 ;
                         c = m_pe_groups[t % m_pe_groups.size()].getAccMat(row, col);
                     } else {
                         c = warp->freg_file_.at(t)[c_index];
-
                     }
                 }
                 A.first = warp->freg_file_.at(t)[a_index];
@@ -151,6 +145,30 @@ void TensorCore::tick() {
                 B.first = warp->freg_file_.at(t)[b_index];
                 B.second = warp->freg_file_.at(t)[b_index+1];
 
+                if (m_pe_groups[t % m_pe_groups.size()].mata().isBackFull()){
+                    MATMetadata meta;
+                    meta.wb = trace->wb;
+                    meta.warp_id = trace->wid;
+                    meta.rd = trace->rdest;
+                    m_pe_groups[t % m_pe_groups.size()].mata().allocateRow(meta);
+                }
+
+                if (m_pe_groups[t % m_pe_groups.size()].matb().isBackFull()){
+                    MATMetadata meta;
+                    meta.wb = trace->wb;
+                    meta.warp_id = trace->wid;
+                    meta.rd = trace->rdest;
+                    m_pe_groups[t % m_pe_groups.size()].matb().allocateRow(meta);
+                }
+
+                if (m_pe_groups[t % m_pe_groups.size()].matc().isBackFull()){
+                    MATMetadata meta;
+                    meta.wb = trace->wb;
+                    meta.warp_id = trace->wid;
+                    meta.rd = trace->rdest;
+                    m_pe_groups[t % m_pe_groups.size()].matc().allocateRow(meta);
+                }
+
                 m_pe_groups[t % m_pe_groups.size()].loadMatA(A.first);
                 m_pe_groups[t % m_pe_groups.size()].loadMatA(A.second);
 
@@ -158,18 +176,92 @@ void TensorCore::tick() {
                 m_pe_groups[t % m_pe_groups.size()].loadMatB(B.second);
 
                 m_pe_groups[t % m_pe_groups.size()].loadAccBuf(c);
-
-
                 }
             }
-
-
             // accept
         }
-        // If there is space in input buffer load them in
 
-        // Computer and queue to output fifo
 
-        // (drain out queue)
+
+}
+
+void TensorCore::compute(){
+    for(size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
+        if (m_pe_groups[grp].matb().isTopFull() && m_pe_groups[grp].getStep() == m_config.num_pes){
+            m_pe_groups[grp].popOperands();
+            continue;
+        }
+        if (m_pe_groups[grp].isReadyToFire()){ // let's assume i always write back for now
+            MATMetadata meta = m_pe_groups[grp].matb().frontMeta();
+            for (size_t pe = 0 ; pe < m_pe_groups[grp].getNumPEs(); pe++) {
+                // calculate all results
+                // step and pop
+                auto& A = m_pe_groups[grp].mata().frontRow();
+                auto& B = m_pe_groups[grp].matb().frontRow();
+                auto& C = m_pe_groups[grp].matc().frontRow();
+
+                uint32_t result = std::inner_product(A.begin()+pe*m_config.operand_count, A.begin()+(pe+1)*m_config.operand_count, B.begin()+pe*m_config.operand_count, 0);
+                result += C[pe];
+
+                // queue
+                m_timing.push({m_cycle+m_config.execution_latency+1, {meta, result, {grp, pe}}});
+                // step
+            }
+
+            if(meta.wb) { // reserve in queue
+                m_pe_groups[grp].reserveOutput();
+            }
+            m_pe_groups[grp].step();
+        }
+    }
+}
+
+void TensorCore::queueToOutput(){
+    while(!m_timing.empty()){
+
+        auto& e = m_timing.front();
+        if (e.first == m_cycle) {
+            auto& [meta, result, pe_id] = e.second;
+            auto& [grp, pe] = pe_id;
+
+            m_pe_groups[grp].insertOutput(pe, meta.warp_id, meta.rd, result);
+            m_timing.pop();
+        }else {
+            break;
+        }
+    }
+}
+
+void TensorCore::drainOutQueue(){
+    // need a better way to propagate backpressure at the output (or not?)
+    // write result in register
+
+    // writeback results
+    for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
+        for (size_t pe = 0 ; pe < m_config.num_pes; pe++) {
+            if(m_pe_groups[grp].getOutputFIFO(pe).isFull()) {
+                auto [warp_id, reg, val] = m_pe_groups[grp].popOutput(pe);
+                auto& warp = core_->warps_[warp_id];
+                warp->freg_file_.at(pe)[reg] = val;
+            }
+        }
+    }
+
+    // send to output & retire trace
+    vortex::pipeline_trace_t* trace = nullptr;
+    Outputs.at(0).send(trace,1 ); //
+}
+
+void TensorCore::tick() {
+    // FOR NOW I ASSUME PARALLEL LOADING (all pe groups are loaded at same time so only need to look at 1 group) (assumption 1)
+    // Ensure all threads are synchronized before doing MMA instruction
+
+    drainOutQueue();
+    queueToOutput();
+    compute();
+    handleInput();
+
+    m_cycle+= 1;
+
 }
 

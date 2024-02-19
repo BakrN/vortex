@@ -1,0 +1,20 @@
+main.o: main.cc parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h ocl.h file.h macros.h \
+ computeQ.h
+args.o: args.c parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h
+parboil_opencl.o: parboil_opencl.c parboil.h \
+ /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h
+ocl.o: ocl.c /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h ocl.h parboil.h
+gpu_info.o: gpu_info.c gpu_info.h
+file.o: file.cc file.h
+computeQ.o: computeQ.c /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h ocl.h macros.h computeQ.h \
+ parboil.h

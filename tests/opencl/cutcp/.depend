@@ -1,0 +1,28 @@
+main.o: main.cc parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h atom.h cutoff.h output.h
+args.o: args.c parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h
+parboil_opencl.o: parboil_opencl.c parboil.h \
+ /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h
+ocl.o: ocl.c /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h ocl.h
+gpu_info.o: gpu_info.c gpu_info.h
+cutoff.o: cutoff.c /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h parboil.h atom.h cutoff.h \
+ macros.h ocl.h
+cutcpu.o: cutcpu.c parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h atom.h cutoff.h
+output.o: output.c parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h atom.h cutoff.h
+readatom.o: readatom.c atom.h
+excl.o: excl.c parboil.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h atom.h cutoff.h

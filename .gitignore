@@ -1,0 +1,66 @@
+
+# Build outputs
+build/
+bin/
+libs/
+objs/
+
+# IDE specific files
+.idea/
+.vscode/
+.cache/*
+
+# Test output
+*.gcno
+*.gcda
+*.gcov
+*.prof
+
+# Coverage reports
+coverage.xml
+lcov.info
+
+# Preprocessor output
+*.i
+*.ii
+
+# Cache files
+*.cache
+
+# Temporary files
+*~
+*.swp
+*.swo
+
+# Debug symbols
+*.dSYM
+
+# Synthesis output
+*syn
+
+# Place and route output
+par
+
+# Timing reports
+timing.rpt
+
+# Netlist
+netlist.v
+
+# SDC constraints
+*.sdc
+
+# Power reports
+power.rpt
+
+# Formal verification reports
+formal.rpt
+
+# Static analysis reports
+lint.log
+cppcheck.log
+
+
+*simx/simx
+*rtlsim/rtlsim
+compile_commands.json

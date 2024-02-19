@@ -1,0 +1,17 @@
+main.o: main.cc oclUtils.h shrUtils.h \
+ /opt/pocl/runtime/include/CL/opencl.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h \
+ /opt/pocl/runtime/include/CL/cl_gl.h \
+ /opt/pocl/runtime/include/CL/cl_ext.h \
+ /opt/pocl/runtime/include/CL/cl_ext_pocl.h shrQATest.h
+oclUtils.o: oclUtils.cpp oclUtils.h shrUtils.h \
+ /opt/pocl/runtime/include/CL/opencl.h /opt/pocl/runtime/include/CL/cl.h \
+ /opt/pocl/runtime/include/CL/cl_version.h \
+ /opt/pocl/runtime/include/CL/cl_platform.h \
+ /opt/pocl/runtime/include/CL/cl_gl.h \
+ /opt/pocl/runtime/include/CL/cl_ext.h \
+ /opt/pocl/runtime/include/CL/cl_ext_pocl.h
+shrUtils.o: shrUtils.cpp shrUtils.h cmd_arg_reader.h exception.h
+cmd_arg_reader.o: cmd_arg_reader.cpp cmd_arg_reader.h exception.h
+transpose_gold.o: transpose_gold.cpp
