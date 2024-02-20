@@ -1,6 +1,7 @@
 #ifndef TENSOR_CORE_H
 #define TENSOR_CORE_H
 #include "exe_unit.h"
+#include "pipeline.h"
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
@@ -333,6 +334,7 @@ class TensorCore : public vortex::ExeUnit{
         std::vector<PEGroup> m_pe_groups;
         std::queue<std::pair<uint64_t, std::tuple<MATMetadata, uint32_t, std::pair<uint32_t, uint32_t>>>> m_timing; // cycles to wait , (meta, result, grp,pe)
 
+        std::queue<vortex::pipeline_trace_t*> m_traces;
         uint64_t m_cycle = 0;
 };
 

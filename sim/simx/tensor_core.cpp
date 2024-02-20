@@ -92,6 +92,7 @@ void TensorCore::handleInput(){
                 std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
                 std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
                 uint32_t c ;
+                auto grp = t % m_pe_groups.size();
                 // find first N(=2) operands of A and B and possible c depending on type
                 int a_index = -1 ;
                 for (auto i = 0 ; i < MAX_NUM_REGS; i++) {
@@ -134,7 +135,7 @@ void TensorCore::handleInput(){
                         // use mat accumulate buffer
                         auto row = 0; // row is dependent on tid
                         auto col = 1 ;
-                        c = m_pe_groups[t % m_pe_groups.size()].getAccMat(row, col);
+                        c = m_pe_groups[grp].getAccMat(row, col);
                     } else {
                         c = warp->freg_file_.at(t)[c_index];
                     }
@@ -145,37 +146,49 @@ void TensorCore::handleInput(){
                 B.first = warp->freg_file_.at(t)[b_index];
                 B.second = warp->freg_file_.at(t)[b_index+1];
 
-                if (m_pe_groups[t % m_pe_groups.size()].mata().isBackFull()){
+                if (m_pe_groups[grp].mata().isBackFull()){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[t % m_pe_groups.size()].mata().allocateRow(meta);
+                    m_pe_groups[grp].mata().allocateRow(meta);
                 }
 
-                if (m_pe_groups[t % m_pe_groups.size()].matb().isBackFull()){
+                if (m_pe_groups[grp].matb().isBackFull()){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[t % m_pe_groups.size()].matb().allocateRow(meta);
+                    m_pe_groups[grp].matb().allocateRow(meta);
                 }
 
-                if (m_pe_groups[t % m_pe_groups.size()].matc().isBackFull()){
+                if (m_pe_groups[grp].matc().isBackFull()){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[t % m_pe_groups.size()].matc().allocateRow(meta);
+                    m_pe_groups[grp].matc().allocateRow(meta);
                 }
 
-                m_pe_groups[t % m_pe_groups.size()].loadMatA(A.first);
-                m_pe_groups[t % m_pe_groups.size()].loadMatA(A.second);
+                m_pe_groups[grp].loadMatA(A.first);
+                m_pe_groups[grp].loadMatA(A.second);
 
-                m_pe_groups[t % m_pe_groups.size()].loadMatB(B.first);
-                m_pe_groups[t % m_pe_groups.size()].loadMatB(B.second);
+                m_pe_groups[grp].loadMatB(B.first);
+                m_pe_groups[grp].loadMatB(B.second);
 
-                m_pe_groups[t % m_pe_groups.size()].loadAccBuf(c);
+                m_pe_groups[grp].loadAccBuf(c);
+                }
+                // queue up trace if it fills up row and wb
+                // Only valid with parallel loading
+                bool add_trace = true;
+                for (size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
+                    if (!(m_pe_groups[grp].mata().isBackFull() && m_pe_groups[grp].matb().isBackFull() && m_pe_groups[grp].matc().isBackFull())) {
+                        add_trace = false;
+                        break;
+                    }
+                }
+                if (add_trace) {
+                    m_traces.push(trace);
                 }
             }
             // accept
@@ -246,10 +259,10 @@ void TensorCore::drainOutQueue(){
             }
         }
     }
-
     // send to output & retire trace
-    vortex::pipeline_trace_t* trace = nullptr;
-    Outputs.at(0).send(trace,1 ); //
+    vortex::pipeline_trace_t* trace = m_traces.front();
+    m_traces.pop();
+    Outputs.at(0).send(trace,1 );
 }
 
 void TensorCore::tick() {
