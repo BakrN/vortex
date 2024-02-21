@@ -27,7 +27,7 @@ index= col + row*total_cols
 total_cols = N/OTILE_COL
 col_offset = (pe_group_id % total_cols) // new col
 
-row_offset = (index - col)/total_cols
+row_offset = (index - col_offset)/total_cols
 
 
 // Row major
