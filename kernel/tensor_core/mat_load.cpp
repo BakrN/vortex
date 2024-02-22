@@ -1,55 +1,77 @@
-#include "../include/vx_intrinsics.h"
-#include <cmath>
+#include "mat_load.hpp"
+#include <cstdint>
+#include <iostream>
 
-// data type
-// M
+#define M 4
+#define N 4
+#define K 8
+#define OTILE_ROW 2
+#define OTILE_COL 2
 
-void load_value(int j, int row_ptr, int& reg) {
-    asm volatile("lw %0, %1(%2)" : "=r"(reg) : "r"(j), "r"(row_ptr));
-}
+#define NUM_PE_PER_GROUP 2
+#define NUM_THREADS 8
+
+#define OP_t uint16_t
+#define Res_t float
 
 
-template<typename T,  int... Is>
-constexpr inline void unrolled_load_row_major(int row_ptr, T (&registers)[sizeof...(Is)], int OTILE_ROW, int OTILE_COL, int A_ROW_STRIDE) {
-    int unused[] = {((void)Is, registers[Is] = Is, 0)...};
-    for (int i = 0; i < OTILE_ROW; ++i) {
-        for (int j = 0; j < OTILE_COL; ++j) {
+void tload(float* A_ptr, float* B_ptr, float* C_ptr,  int row, int col, int stride, int thread_id) {
+    // Create A matrix and fill it with some values
+    //uint16_t A [4][4] = {
+    //    {1, 2, 3, 4},
+    //    {5, 6, 7, 8},
+    //    {9, 10, 11, 12},
+    //    {13, 14, 15, 16}
+    //};
+    //// Creat B matrix and fill it with some values
+    //uint16_t B [4][4] = {
+    //    {1, 2, 3, 4},
+    //    {5, 6, 7, 8},
+    //    {9, 10, 11, 12},
+    //    {13, 14, 15, 16}
+    //};
+    //// Create C matrix and fill it with some values
+    //float C [4][4] = {
+    //    {1, 2, 3, 4},
+    //    {5, 6, 7, 8},
+    //    {9, 10, 11, 12},
+    //    {13, 14, 15, 16}
+    //};
 
-            registers[i * OTILE_COL + j] = row_ptr + j;// re
-        }
-        row_ptr += A_ROW_STRIDE;
+    //float* A_ptr = reinterpret_cast<float*>(A);
+    //float* B_ptr = reinterpret_cast<float*>(B);
+    //float* C_ptr = reinterpret_cast<float*>(C);
+
+    //float* A_ptr = reinterpret_cast<float*>(a_ptr);
+    //float* B_ptr = reinterpret_cast<float*>(b_ptr);
+    //float* C_ptr = reinterpret_cast<float*>(c_ptr);
+    float  regA[K/2];
+    float regB[K/2];
+    float  regC[K];
+    //float  regD[K];
+
+    //for (auto thread_id = 0 ; thread_id < NUM_THREADS ; thread_id++)  {
+        //std::cout << "#########################" <<  std::endl;
+        //std::cout << "Now accessing thread id: " << thread_id << std::endl;
+        tc_load<OP_t, Res_t, M, N, K,OTILE_ROW, OTILE_COL, NUM_PE_PER_GROUP>(A_ptr, B_ptr, C_ptr, reinterpret_cast<float*>(regA), reinterpret_cast<float*>(regB), regC,  2 , 2, 4, 0) ;
+        //std::cout << "#########################" << std::endl;
+    //}
+
+
+    float regD;
+    for (auto i = 0; i < K/2; i++) {
+          regD += regA[i] * regB[i];
     }
-}
+    std::cout << "regD = " << regD << std::endl;
 
-template <typename T_OP, typename T_ACC,
-
-    size_t M , size_t N , size_t K  ,     // OUTput matrix sizes
-    size_t OTILE_ROW , size_t OTILE_COL,  // output tile partitioning
-    size_t NUM_GROUPS, size_t NUM_PES
-
-    >
-
-
-void tc_load(T_OP* A, T_OP* B, T_ACC* C, size_t A_ROW_STRIDE){
-    int thread_id = vx_thread_id();
-    int pe_group_id = thread_id  >> (int)log2(NUM_GROUPS);
-    constexpr int total_cols = N / OTILE_COL;
-    int col_group = pe_group_id % total_cols;
-    int row_group = (pe_group_id -col_group)/total_cols;
-    // Row major A
-    auto row_thread = row_group * OTILE_ROW + (thread_id % OTILE_ROW);
-    auto col_thread = col_group * OTILE_COL;
-
-    auto row_ptr = A + row_group*(A_ROW_STRIDE + row_thread) + col_thread;
-    // repeat for K as well
-    // create a regA  (per thread)
-
-
-    T_OP regA[];   // how wide the multiplication is
+    //for (int i = 0; i < K; i++) {
+    //      printf("regA[%d] = %d\n", i, regA[i]);
+    //}
+    //for (int i = 0; i < K; i++) {
+    //      printf("regB[%d] = %d\n", i, regB[i]);
+    //}
+    //for (int i = 0; i < K; i++) {
+    //      printf("regC[%d] = %f\n", i, regC[i]);
+    //}
 
 }
-
-
-// Row major B
-//
-//

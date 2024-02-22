@@ -89,7 +89,7 @@ template <typename OP_t, typename Res_t,
     >
 
 
-void tc_load(Res_t* A, Res_t* B, Res_t* C, size_t A_STRIDE, size_t B_STRIDE, size_t C_STRIDE, size_t tid){
+inline void tc_load(Res_t* A, Res_t* B, Res_t* C, Res_t* regA, Res_t* regB, Res_t* regC , size_t A_STRIDE, size_t B_STRIDE, size_t C_STRIDE, size_t tid){
     constexpr int total_cols = N / OTILE_COL;
     int thread_id = tid;
     int pe_group_id = thread_id  /NUM_PE_PER_GROUP;
@@ -102,20 +102,20 @@ void tc_load(Res_t* A, Res_t* B, Res_t* C, size_t A_STRIDE, size_t B_STRIDE, siz
     Res_t* a_row_ptr = A + row_offset/(sizeof(Res_t)/sizeof(OP_t));
 
     // print all above variables
-    printf("row_thread = %d\n", row_offset);
-    printf("col_thread = %d\n", col_offset);
-    printf("row_group = %d\n", row_group);
-    printf("col_group = %d\n", col_group);
-    printf("pe_group_id = %d\n", pe_group_id);
-    printf("thread_id = %d\n", thread_id);
-    printf("A offset: %d\n", a_row_ptr - A);
+    //printf("row_thread = %d\n", row_offset);
+    //printf("col_thread = %d\n", col_offset);
+    //printf("row_group = %d\n", row_group);
+    //printf("col_group = %d\n", col_group);
+    //printf("pe_group_id = %d\n", pe_group_id);
+    //printf("thread_id = %d\n", thread_id);
+    //printf("A offset: %d\n", a_row_ptr - A);
 
 
     // Load entire K in  or just OTILE_COL  (for now only load OTILE_COL)
-    Res_t regA[K/(sizeof(Res_t)/sizeof(OP_t))];
+    //Res_t regA[K/(sizeof(Res_t)/sizeof(OP_t))];
     unrolled_load_row_row_major<0, 0, K/(sizeof(Res_t)/sizeof(OP_t)),1, Res_t>(a_row_ptr, regA, A_STRIDE); // this actually loads pe group
 
-    Res_t regB[K/(sizeof(Res_t)/sizeof(OP_t))];
+    //Res_t regB[K/(sizeof(Res_t)/sizeof(OP_t))];
     // B col row major
     Res_t* b_col_ptr = B + col_offset/(sizeof(Res_t)/sizeof(OP_t));
     unrolled_load_col_row_major<0, 0, 1,K/(sizeof(Res_t)/sizeof(OP_t)), Res_t>(b_col_ptr, regB, B_STRIDE);
@@ -125,7 +125,7 @@ void tc_load(Res_t* A, Res_t* B, Res_t* C, size_t A_STRIDE, size_t B_STRIDE, siz
     auto c_row_offset = C_STRIDE*(row_group * OTILE_ROW + (thread_id % OTILE_ROW));
     auto c_col_offset = col_group*OTILE_COL;
     Res_t* c_row_ptr = C + c_row_offset + c_col_offset;
-    Res_t regC[OTILE_ROW* OTILE_COL]; // row major
+    //Res_t regC[OTILE_ROW* OTILE_COL]; // row major
     unrolled_load_row_row_major<0, 0,OTILE_COL,1,  Res_t>(c_row_ptr, regC, C_STRIDE);
 
 
