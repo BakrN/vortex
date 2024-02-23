@@ -727,25 +727,22 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         // using sam
         instr->addSrcReg(rs1 , RegType::Float);
         instr->addSrcReg(rs2 , RegType::Float);
-        if (func3 == 1) { // accumulation value
-            if ((func2&2) == 1) {  // determine c source
-                instr->addSrcReg(rs3, RegType::TC);
-            } else {
-                instr->addSrcReg(rs3, RegType::Float);
-            }
-        }
-        if ((func2&1)==1) {
-            instr->setDestReg(rd, RegType::TC);
-        } else {
+        if (func3 == 0) { // (determine wb destination) (0: reg file , 1: TC)
             instr->setDestReg(rd, RegType::Float);
+        } else {
+            instr->setDestReg(rd, RegType::TC);
         }
+        if (func2 == 0) {
+            // no accumulation source
+        } else if (func2 ==1) {
+            // accumulation source is register
+            instr->addSrcReg(rs3, RegType::Float);
+        } else {
+            instr->addSrcReg(rs3, RegType::TC);
+        }
+
         instr->setFunc2(func2);
         instr->setFunc3(func3);
-    }  else {
-      instr->setDestReg(rd, RegType::Float);
-      instr->addSrcReg(rs1, RegType::Float);
-      instr->addSrcReg(rs2, RegType::Float);
-      instr->addSrcReg(rs3, RegType::Float);
     }
     instr->setFunc2(func2);
     instr->setFunc3(func3);
