@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ void Warp::reset() {
 #if (XLEN == 64)
   PC_ = (uint64_t(core_->dcrs().base_dcrs.read(VX_DCR_BASE_STARTUP_ADDR1)) << 32) | PC_;
 #endif
-  tmask_.reset();  
+  tmask_.reset();
   issued_instrs_ = 0;
   for (uint32_t i = 0, n = arch_.num_threads(); i < n; ++i) {
     for (auto& reg : ireg_file_.at(i)) {
@@ -67,7 +67,7 @@ pipeline_trace_t* Warp::eval() {
 #else
   uint64_t uuid = 0;
 #endif
-  
+
   DPH(1, "Fetch: cid=" << core_->id() << ", wid=" << warp_id_ << ", tmask=");
   for (uint32_t i = 0, n = arch_.num_threads(); i < n; ++i)
     DPN(1, tmask_.test(i));
@@ -82,7 +82,7 @@ pipeline_trace_t* Warp::eval() {
   if (!instr) {
     std::cout << std::hex << "Error: invalid instruction 0x" << instr_code << ", at PC=0x" << PC_ << " (#" << std::dec << uuid << ")" << std::endl;
     std::abort();
-  }  
+  }
 
   DP(1, "Instr 0x" << std::hex << instr_code << ": " << *instr);
 
@@ -94,7 +94,16 @@ pipeline_trace_t* Warp::eval() {
   trace->tmask = tmask_;
   trace->rdest = instr->getRDest();
   trace->rdest_type = instr->getRDType();
-    
+
+  trace->rsrc1 = instr->getRSrc1();
+  if (instr->getNRSrc() > 1) {
+    trace->rsrc2 = instr->getRSrc2();
+  }
+  if (instr->getNRSrc() > 2) {
+    trace->rsrc3 = instr->getRSrc3();
+  }
+
+
   // Execute
   this->execute(*instr, trace);
 
@@ -111,7 +120,7 @@ pipeline_trace_t* Warp::eval() {
       DPN(5, ' ' << std::setfill('0') << std::setw(16) << std::hex << freg_file_.at(j).at(i) << std::setfill(' ') << ' ');
     }
     DPN(5, std::endl);
-  }  
+  }
 
   return trace;
 }
