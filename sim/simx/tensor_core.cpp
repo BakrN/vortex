@@ -1,6 +1,7 @@
 #include "tensor_core.h"
 #include "pipeline.h"
 #include "core.h"
+#include "types.h"
 #include <numeric>
 
 
@@ -94,57 +95,31 @@ void TensorCore::handleInput(){
                 uint32_t c ;
                 auto grp = t % m_pe_groups.size();
                 // find first N(=2) operands of A and B and possible c depending on type
-                int a_index = -1 ;
-                for (auto i = 0 ; i < MAX_NUM_REGS; i++) {
-                    if (trace->used_fregs[i]) {
-                        a_index = i ;
-                        break;
-                    }
-                }
-                #ifdef DEBUG
-                if (a_index == -1) {
-                    throw std::runtime_error("No operands found");
-                }
-                if (a_index >= MAX_NUM_REGS-1) {
-                    throw std::runtime_error("Invalid register index for a operand");
-                }
-                #endif
 
-                int b_index = -1;
-                for (auto i = a_index+1; i < MAX_NUM_REGS; i++) {
-                    if (trace->used_fregs[i]) {
-                        b_index = i ;
-                        break;
-                    }
-                }
-
-                int c_index = -1 ;
                 c = 0 ;
-                if (trace->tc_type == vortex::TCOpType::WITH_ACC) {
+                if (trace->tc_type != vortex::TCOpType::NO_ACC) {
                     [[likely]]
-                    if (b_index != MAX_NUM_REGS-1) {
+                    if (trace->tc_type == vortex::TCOpType::ACC_REG) {
+                        c = warp->freg_file_.at(t)[trace->rsrc3];
                         // fetch from mat tile accumulator
-                        for (auto i = b_index+1; i < MAX_NUM_REGS; i++) {
-                            if (trace->used_fregs[i]) {
-                                c_index = i ;
-                                break;
-                            }
-                        }
                     }
-                    if (c_index == -1) {
+                    else  {
                         // use mat accumulate buffer
+                        // fetch from accumulate buffer
                         auto row = 0; // row is dependent on tid
-                        auto col = 1 ;
+                        auto col = trace->rsrc3;
                         c = m_pe_groups[grp].getAccMat(row, col);
-                    } else {
-                        c = warp->freg_file_.at(t)[c_index];
                     }
                 }
-                A.first = warp->freg_file_.at(t)[a_index];
-                A.second = warp->freg_file_.at(t)[a_index+1];
 
-                B.first = warp->freg_file_.at(t)[b_index];
-                B.second = warp->freg_file_.at(t)[b_index+1];
+                uint32_t a_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc1];
+                uint32_t b_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc2];
+
+                A.first = (a_val & 0xFFFF0000) >> 16;
+                A.second = a_val & 0xFFFF ;
+
+                B.first = (b_val & 0xFFFF0000) >> 16;
+                B.second = b_val & 0xFFFF ;
 
                 if (m_pe_groups[grp].mata().isBackFull()){
                     MATMetadata meta;

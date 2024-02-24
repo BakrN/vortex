@@ -58,9 +58,9 @@ public:
   Word        PC;
 
   //--
-  uint32_t    rsrc1;
-  uint32_t    rsrc2;
-  uint32_t    rsrc3;
+  uint32_t    rsrc1=-1;
+  uint32_t    rsrc2=-1;
+  uint32_t    rsrc3=-1;
   uint32_t    rdest;
   RegType     rdest_type;
   bool        wb;

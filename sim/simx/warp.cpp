@@ -95,12 +95,12 @@ pipeline_trace_t* Warp::eval() {
   trace->rdest = instr->getRDest();
   trace->rdest_type = instr->getRDType();
 
-  trace->rsrc1 = instr->getRSrc1();
+  trace->rsrc1 = instr->getRSrc(0);
   if (instr->getNRSrc() > 1) {
-    trace->rsrc2 = instr->getRSrc2();
+    trace->rsrc2 = instr->getRSrc(1);
   }
   if (instr->getNRSrc() > 2) {
-    trace->rsrc3 = instr->getRSrc3();
+    trace->rsrc3 = instr->getRSrc(2);
   }
 
 
