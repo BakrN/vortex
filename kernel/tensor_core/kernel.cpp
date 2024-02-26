@@ -2,6 +2,7 @@
 #include <vx_intrinsics.h>
 #include <vx_print.h>
 #include "base/mat_load.hpp"
+#include "base/mat_mma.hpp"
 
 #define M 4
 #define N 4
@@ -46,6 +47,8 @@ int main() {
     float* B_ptr = reinterpret_cast<float*>(B);
     float* C_ptr = reinterpret_cast<float*>(C);
 
+    // Loading the data
+
     float regA[K/2] = {0};
     float regB[K/2] = {0};
     float  regC[K] = {0};
@@ -64,6 +67,11 @@ int main() {
     for (int i = 0 ; i < K; i++) {
         vx_printf("(%d) regC[%d] = %f\n", thread_id, i, regC[i]);
     }
+    // Doing computation
+
+    mat_mma
+
+    // Storing the data
 
     return 0 ;
 }
