@@ -61,24 +61,24 @@ inline void mat_mma_multi_use_accum(){
 }
 
 // A buffer size =
-template<int dot_width, int num_groups, int num_pes, int b_width, int SETS, int op_size_bytes = 2>
-inline void mat_mma_parallel_wb(float* A , float* B , float* C, float* result) {
-    // per thread loading into tensor core
+template<int dot_width, int num_groups, int num_pes, int b_width, int CUR_SET = 0 , int SETS=1, int op_size_bytes = 2>
+inline void mat_mma_parallel_wb(float* regA , float* regB , float* regC, float* regresult) {
     constexpr int num_loads = dot_width / (4/op_size_bytes);
-
-    // if it's equal to 1 then just store back directly
-    if constexpr(num_loads == 1) {
-        mat_mma_wb<Acc_t::ACC_REG>(A ,B, C, result) ;
-    } else if constexpr(num_loads ==  2){
-        mat_mma<Acc_t::ACC_REG>(A ,B, C) ;  // load in a b and c
-        mat_mma_wb<Acc_t::ACC_NONE>(A ,B, C, result) ;
+    if constexpr (CUR_SET < SETS) {
+        // if it's equal to 1 then just store back directly
+        if constexpr(num_loads == 1) {
+            mat_mma_wb<Acc_t::ACC_REG>(regA ,regB, regC, regresult) ;
+        } else if constexpr(num_loads ==  2){
+            mat_mma<Acc_t::ACC_REG>(regA ,regB, regC) ;  // load in a b and c
+            mat_mma_wb<Acc_t::ACC_NONE>(regA ,regB, regC, regresult) ;
+        } else {
+            mat_mma<Acc_t::ACC_REG>(regA ,regB, regC) ;  // load in a b and c
+            unrolled_mat_mma<1, num_loads-1, Acc_t::ACC_NONE>(regA,regB,regC);
+            mat_mma_wb<Acc_t::ACC_NONE>(regA ,regB, regC,regresult) ;  // load in a b and c
+        }
     } else {
-        mat_mma<Acc_t::ACC_REG>(A ,B, C) ;  // load in a b and c
-        unrolled_mat_mma<1, num_loads-1, Acc_t::ACC_NONE>(A,B,C);
-        mat_mma_wb<Acc_t::ACC_NONE>(A ,B, C,result) ;  // load in a b and c
+        mat_mma_parallel_wb<dot_width, num_groups, num_pes, b_width, CUR_SET+1, SETS, op_size_bytes>(regA + num_loads, regB+num_loads, regresult, regresult + num_loads); // overwrite regc
     }
-
-
 }
 
 #endif
