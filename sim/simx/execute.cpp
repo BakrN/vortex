@@ -1303,6 +1303,9 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           // RV32F: FNMSUB.S
           rddata[t].u64 = nan_box(rv_fnmsub_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), check_boxing(rsdata[t][2].u64), frm, &fflags));
         break;
+      case MMA:
+        // Functional exec happens in the core
+        break ;
       default:
         break;
       }

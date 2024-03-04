@@ -22,4 +22,8 @@ int main(){
 
 
     free(D_expected) ;
+    free(A);
+    free(B);
+    free(C);
+    free(D);
 }

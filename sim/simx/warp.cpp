@@ -103,6 +103,10 @@ pipeline_trace_t* Warp::eval() {
     trace->rsrc3 = instr->getRSrc(2);
   }
 
+  if (instr->getOpcode() == Opcode::MMA) {
+    trace->exe_type = ExeType::TC;
+  }
+
 
   // Execute
   this->execute(*instr, trace);

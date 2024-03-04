@@ -7,6 +7,46 @@
 #include <stdexcept>
 
 
+#ifndef TC_NUM_PES
+#define TC_NUM_PES 2
+#endif
+
+#ifndef TC_NUM_PE_GROUPS
+#define TC_NUM_PE_GROUPS 2
+#endif
+
+#ifndef TC_EXECUTION_LAT
+#define TC_EXECUTION_LAT 8
+#endif
+
+#ifndef TC_NUM_PES
+#define TC_NUM_PES 2
+#endif
+
+#ifndef TC_OP_COUNT
+#define TC_OP_COUNT 4
+#endif
+
+#ifndef TC_MAT_BUF_DEPTH
+#define TC_MAT_BUF_DEPTH 4
+#endif
+
+#ifndef TC_ACC_BUF_ROWS // tileRows
+#define TC_ACC_BUF_ROWS 4
+#endif
+
+#ifndef TC_ACC_BUF_COLS // tileCols
+#define TC_ACC_BUF_COLS 4
+#endif
+
+#ifndef TC_OUTPUT_FIFO_SIZE
+#define TC_OUTPUT_FIFO_SIZE 4
+#endif
+
+#ifndef TC_NUM_ACC_TILES
+#define TC_NUM_ACC_TILES 4
+#endif
+
 template <typename T>
 struct FIFO {
     public:
@@ -305,7 +345,7 @@ class TensorCore : public vortex::ExeUnit{
         struct Config_t {
             // Core parameters
             size_t num_pe_groups;
-            size_t execution_latency;
+            size_t execution_latency = 8;
             // PE Group parameter
             size_t num_pes;
             size_t operand_count;

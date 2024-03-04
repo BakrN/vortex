@@ -93,8 +93,8 @@ enum class ExeType {
   LSU,
   FPU,
   SFU,
-  MAX,
-  TC
+  TC,
+  MAX
 };
 
 inline std::ostream &operator<<(std::ostream &os, const ExeType& type) {
@@ -103,8 +103,8 @@ inline std::ostream &operator<<(std::ostream &os, const ExeType& type) {
   case ExeType::LSU: os << "LSU"; break;
   case ExeType::FPU: os << "FPU"; break;
   case ExeType::SFU: os << "SFU"; break;
-  case ExeType::MAX: break;
   case ExeType::TC:  os << "TC"; break;
+  case ExeType::MAX: break;
   }
   return os;
 }

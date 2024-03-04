@@ -24,6 +24,7 @@
 #include "debug.h"
 #include "constants.h"
 #include "processor_impl.h"
+#include "tensor_core.h"
 
 using namespace vortex;
 
@@ -75,12 +76,26 @@ Core::Core(const SimContext& ctx,
   dispatchers_.at((int)ExeType::FPU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, NUM_FPU_BLOCKS, NUM_FPU_LANES);
   dispatchers_.at((int)ExeType::LSU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_LSU_LANES);
   dispatchers_.at((int)ExeType::SFU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_SFU_LANES);
+  dispatchers_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, TC_NUM_PES); // 1 TC block with 8 PEs
 
   // initialize execute units
   exe_units_.at((int)ExeType::ALU) = SimPlatform::instance().create_object<AluUnit>(this);
   exe_units_.at((int)ExeType::FPU) = SimPlatform::instance().create_object<FpuUnit>(this);
   exe_units_.at((int)ExeType::LSU) = SimPlatform::instance().create_object<LsuUnit>(this);
   exe_units_.at((int)ExeType::SFU) = SimPlatform::instance().create_object<SfuUnit>(this);
+
+  TensorCore::Config_t tc_config;
+  tc_config.num_pe_groups = TC_NUM_PE_GROUPS;
+  tc_config.execution_latency = TC_EXECUTION_LAT;
+  tc_config.num_pes = TC_NUM_PES;
+  tc_config.operand_count = TC_OP_COUNT;
+  tc_config.input_mat_buf_depth = TC_MAT_BUF_DEPTH;
+  tc_config.acc_buf_rows = TC_ACC_BUF_ROWS;
+  tc_config.acc_buf_cols = TC_ACC_BUF_COLS;
+  tc_config.output_fifo_size = TC_OUTPUT_FIFO_SIZE;
+  tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
+
+  exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TensorCore>(this, tc_config);
 
   this->reset();
 }

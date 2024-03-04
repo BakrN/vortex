@@ -1,6 +1,35 @@
 import numpy as np
 import argparse
 
+# Tensor core parameters
+class TCParams:
+    num_pes = 3         # TC_NUM_PES
+    num_groups = 2      # TC_NUM_GROUPS
+    dot_size = 4        # TC_DOT_SIZE
+    buffer_depth = 2    # TC_BUFFER_DEPTH
+    sets = 4            # TC_SETS
+    num_acc_tiles = 2   # TC_NUM_ACC_TILES
+    out_fifo_size = 2   # TC_OUT_FIFO_SIZE
+
+    def DNUM_PES(self):
+        return "-DTC_NUM_PES=" + str(self.num_pes)
+    def DNUM_GROUPS(self):
+        return "-DTC_NUM_PE_GROUPS=" + str(self.num_groups)
+    def DOP_COUNT(self):
+        return "-DTC_OP_COUNT=" + str(self.dot_size)
+    def DMAT_BUF_DEPTH(self):
+        return "-DTC_MAT_BUF_DEPTH=" + str(self.buffer_depth)
+    def DACC_BUF_ROWS(self):
+        return "-DTC_ACC_BUF_ROWS=" + ""  # TODO
+    def DACC_BUF_COLS(self):
+        return "-DTC_ACC_BUF_COLS=" + ""  # TODO
+    def DOUTPUT_FIFO_SIZE(self):
+        return "-DTC_OUTPUT_FIFO_SIZE=" + str(self.out_fifo_size)
+    def DNUM_ACC_TILES(self):
+        return "-DTC_NUM_ACC_TILES=" + str(self.num_acc_tiles)
+
+
+
 class MatMemOrientation:
     ROW_MAJOR = 0
     COL_MAJOR = 1
