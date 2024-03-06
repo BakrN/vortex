@@ -10,10 +10,12 @@ PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth
     m_mat_b(operands_count*num_pes, input_mat_buf_depth),
     m_mat_c(operands_count*num_pes/2, input_mat_buf_depth), // /2 because acc is uin32_t
     m_tile_accumulator(acc_buf_rows,acc_buf_cols, num_acc_tiles, num_pes) ,
-    m_output_fifo( output_fifo_size),
+
     m_num_pes(num_pes)
 {
-
+    for (size_t i = 0; i < num_pes; i++) {
+        m_output_fifo.emplace_back(FIFO<std::tuple<uint32_t, uint16_t, uint32_t>>(output_fifo_size));
+    }
 }
 
 void PEGroup::loadMatA(const std::vector<uint16_t>& data){
@@ -21,15 +23,29 @@ void PEGroup::loadMatA(const std::vector<uint16_t>& data){
         m_mat_a.insert(e);
 }
 
+void PEGroup::loadMatA(uint16_t e){
+    m_mat_a.insert(e);
+}
+
+
 void PEGroup::loadMatB( const std::vector<uint16_t>& data){
     for (auto& e: data)
         m_mat_b.insert(e);
+}
+
+void PEGroup::loadMatB(uint16_t e){
+    m_mat_b.insert(e);
 }
 
 void PEGroup::loadAccBuf(const std::vector<uint32_t>& data) {
     for (auto& e: data)
         m_mat_c.insert(e);
 }
+
+void PEGroup::loadAccBuf(uint32_t e){
+    m_mat_c.insert(e);
+}
+
 void PEGroup::insertOutput(size_t pe_id,uint32_t warp_id,  uint16_t reg, uint32_t val){
     m_output_fifo[pe_id].push(std::make_tuple(warp_id,reg, val));
 }
@@ -51,6 +67,8 @@ uint32_t PEGroup::getAccMat(size_t row, size_t col) {
     return m_tile_accumulator.getData(row, col);
 }
 
+PEGroup::~PEGroup() {
+}
 
 TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t config) : vortex::ExeUnit(ctx,core,  "TensorCore"), m_config(config) {
     // initialize the PE Groups

@@ -133,6 +133,8 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         break;
       case RegType::None:
         break;
+      case RegType::TC:
+        break;
       }
     }
   }
