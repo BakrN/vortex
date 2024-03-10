@@ -92,3 +92,4 @@ compile_commands.json
 */vx_malloc/vx_malloc
 *.pocl
 
+.cache/*

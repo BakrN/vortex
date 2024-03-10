@@ -19,7 +19,10 @@
 int main() {
     vx_tmc(-1) ;  // enable all threads
 
-    float regA[]; // dot width
+    float regA[16]; // dot width
+    float regB[16]; // dot width
+    float regC[16]; // dot width
+    float regD[16]; // dot width
 
     // try half thread masking
     return 0 ;
