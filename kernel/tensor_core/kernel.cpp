@@ -18,8 +18,8 @@
 
 
 int main() {
-    vx_tmc(-1) ;
-    int thread_id = vx_thread_id();
+    //vx_tmc(-1) ;
+   int thread_id = vx_thread_id();
 
     float A [4][2] = {
         {0b00000000000000010000000000000010, 0b00000000000000110000000000000100},
@@ -68,8 +68,6 @@ int main() {
         vx_printf("(%d) regC[%d] = %f\n", thread_id, i, regC[i]);
     }
     // Doing computation
-
-    mat_mma
 
     // Storing the data
 

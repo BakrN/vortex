@@ -1,8 +1,11 @@
 #ifndef MAT_MMA_HPP
 #define MAT_MMA_HPP
 #include <cstdint>
-#include <type_traits>
 
+#define REGA f0 // based on MNK before I have to write back to mem....
+#define REGB f1
+#define REGC f4 // Define in python  (Ideally this should be done in the compiler LLVM)
+#define REGD f8
 #define TC_EXT 0x7B
 
 enum class Acc_t : uint8_t {

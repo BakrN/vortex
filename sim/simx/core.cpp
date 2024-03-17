@@ -76,7 +76,7 @@ Core::Core(const SimContext& ctx,
   dispatchers_.at((int)ExeType::FPU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, NUM_FPU_BLOCKS, NUM_FPU_LANES);
   dispatchers_.at((int)ExeType::LSU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_LSU_LANES);
   dispatchers_.at((int)ExeType::SFU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_SFU_LANES);
-  dispatchers_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, TC_NUM_PES); // 1 TC block with 8 PEs
+  dispatchers_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, TC_NUM_PES);
 
   // initialize execute units
   exe_units_.at((int)ExeType::ALU) = SimPlatform::instance().create_object<AluUnit>(this);

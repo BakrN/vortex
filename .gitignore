@@ -91,5 +91,6 @@ compile_commands.json
 # KERNEL
 */vx_malloc/vx_malloc
 *.pocl
+*.log
 
 .cache/*

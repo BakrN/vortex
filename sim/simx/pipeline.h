@@ -153,6 +153,7 @@ inline std::ostream &operator<<(std::ostream &os, const pipeline_trace_t& state)
   os << "cid=" << state.cid;
   os << ", wid=" << state.wid;
   os << ", tmask=";
+  std::cout << state.arch.num_threads() << std::endl;
   for (uint32_t i = 0, n = state.arch.num_threads(); i < n; ++i) {
       os << state.tmask.test(i);
   }

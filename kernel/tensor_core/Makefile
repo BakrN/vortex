@@ -29,7 +29,7 @@ LDFLAGS += -lm -Wl,-Bstatic,--gc-sections,-T,$(VORTEX_KN_PATH)/linker/vx_link$(X
 
 PROJECT = GEMM
 
-SRCS = kernel.cpp
+SRCS = kernel.cpp #mat_kernel.cpp
 
 all: $(PROJECT).elf $(PROJECT).bin $(PROJECT).dump
 
@@ -46,7 +46,7 @@ run-rtlsim: $(PROJECT).bin
 	$(SIM_DIR)/rtlsim/rtlsim $(PROJECT).bin
 
 run-simx: $(PROJECT).bin
-	$(SIM_DIR)/simx/simx  $(PROJECT).bin -c 1 -w 1 -t 1
+	gdb --args $(SIM_DIR)/simx/simx  $(PROJECT).bin -c 1 -w 1 -t 4
 out-asm:
 	$(CC) $(CFLAGS) $(SRCS) $(LDFLAGS) -S -o $(PROJECT).s
 

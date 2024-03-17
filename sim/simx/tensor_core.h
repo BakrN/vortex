@@ -19,10 +19,6 @@
 #define TC_EXECUTION_LAT 8
 #endif
 
-#ifndef TC_NUM_PES
-#define TC_NUM_PES 2
-#endif
-
 #ifndef TC_OP_COUNT
 #define TC_OP_COUNT 4
 #endif
@@ -47,21 +43,18 @@
 #define TC_NUM_ACC_TILES 4
 #endif
 
+
 template <typename T>
 struct FIFO {
     public:
         FIFO(size_t size): m_size(size) {
-            if (size)
-                m_data = new T[size];
-            else
-                m_data = nullptr;
+            assert(size) ;
+            m_data.resize(size);
             m_tail = 0 ;
             m_head = 0 ;
             m_reserved =0 ;
         }
         ~FIFO(){
-            if (m_size)
-                delete[] m_data;
         }
 
         void push(T data){
@@ -100,7 +93,7 @@ struct FIFO {
             m_reserved++;
         }
     private:
-        T* m_data;
+        std::vector<T> m_data;
         size_t m_head;
         size_t m_reserved;
         size_t m_tail;
@@ -117,7 +110,9 @@ struct MATMetadata {
 template <typename T>
 class MATBuffer{
 public:
-  explicit MATBuffer(size_t width, size_t max_depth) : m_width(width), m_max_depth(max_depth), m_rows(1u) {}
+  MATBuffer(size_t width, size_t max_depth) : m_width(width), m_max_depth(max_depth), m_rows(0) {}
+  MATBuffer() {}
+  ~MATBuffer(){ }
 
     // Checks if the top row is full
   bool isTopFull() const { return m_data.front().second.size() == m_width; }
@@ -129,12 +124,11 @@ public:
   void allocateRow(MATMetadata meta){
       m_data.push({meta,{}});
       m_rows++;
-      // get metadata
   }
 
   // Attempts to insert a value
   void insert(const T& value) {
-    if (m_max_depth >= m_rows && isTopFull()) {
+    if (m_rows >= m_max_depth&& isTopFull()) {
       throw std::runtime_error("Structure is full");
     }
 
@@ -151,7 +145,6 @@ public:
 
     return m_data.front().second.front();
   }
-  // Returns the top value and removes it
 
   void popRow() {
     if (m_data.empty()) {
@@ -161,7 +154,10 @@ public:
     m_rows--;
   }
 
-  bool  isBackFull() const { return m_data.back().second.size() == m_width; }
+  bool  isBackFull() const {
+      if (m_data.empty())
+        return false;
+      return m_data.back().second.size() == m_width; }
 
   int width() const { return m_width; }
 
@@ -190,25 +186,14 @@ class AccBuffer { // Accumulator buffer
     public:
         AccBuffer(size_t num_rows,
                   size_t num_cols,
-                  size_t num_acc_tiles,
-                  size_t head_width) : m_num_rows(num_rows),
-                                       m_num_cols(num_cols),
-                                       m_num_acc_tiles(num_acc_tiles),
-                                       m_head_width(head_width){
-            m_data = new T*[m_num_rows];
-            for (size_t i = 0; i < m_num_rows; i++){
-                m_data[i] = new T[m_num_cols];
-            }
+                  size_t num_acc_tiles
+                  ) : m_num_rows(num_rows),
+                      m_num_cols(num_cols),
+                      m_num_acc_tiles(num_acc_tiles)
+        {
 
-            m_head = new T[m_head_width];
-            m_head_index = 0 ;
         }
         ~AccBuffer() {
-            for (size_t i = 0; i < m_num_rows; i++){
-                delete [] m_data[i];
-            }
-            delete [] m_data;
-            delete [] m_head;
         }
 
         T getData(size_t row , size_t col) {
@@ -219,13 +204,6 @@ class AccBuffer { // Accumulator buffer
             m_data[row][col] = data;
         }
 
-        void enqueue(T data) {
-            if (m_head_index == m_head_width){
-                throw std::runtime_error("Head is full");
-            }
-            m_head[m_head_index] = data;
-            m_head_index = (m_head_index + 1) % m_head_width;
-        }
 
         void clear(){
             m_head_index = 0;
@@ -238,7 +216,6 @@ class AccBuffer { // Accumulator buffer
         size_t m_num_rows;
         size_t m_num_cols;
         size_t m_num_acc_tiles;
-        size_t m_head_width;
 
         uint32_t m_head_index;
 };
@@ -356,6 +333,20 @@ class TensorCore : public vortex::ExeUnit{
             size_t num_acc_tiles;
             // UNUSED FOR NOW
             size_t operand_count_b;
+
+            void print(){
+                std::cout << "TensorCore Config: " << std::endl;
+                std::cout << "num_pe_groups: " << num_pe_groups << std::endl;
+                std::cout << "execution_latency: " << execution_latency << std::endl;
+                std::cout << "num_pes: " << num_pes << std::endl;
+                std::cout << "operand_count: " << operand_count << std::endl;
+                std::cout << "input_mat_buf_depth: " << input_mat_buf_depth << std::endl;
+                std::cout << "acc_buf_rows: " << acc_buf_rows << std::endl;
+                std::cout << "acc_buf_cols: " << acc_buf_cols << std::endl;
+                std::cout << "output_fifo_size: " << output_fifo_size << std::endl;
+                std::cout << "num_acc_tiles: " << num_acc_tiles << std::endl;
+                std::cout << "operand_count_b: " << operand_count_b << std::endl;
+            }
         };
         TensorCore(const SimContext& ctx, vortex::Core*, Config_t config);
         void tick();

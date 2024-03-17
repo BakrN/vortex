@@ -21,14 +21,14 @@ SRCS += processor.cpp cluster.cpp core.cpp warp.cpp decode.cpp execute.cpp exe_u
 ifdef DEBUG
 	CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG)
 	#CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG) -fsanitize=address -fno-omit-frame-pointer
-else    
-	CXXFLAGS += -O2 -DNDEBUG
+else
+	CXXFLAGS +=  -O2 -DNDEBUG
 endif
 
 PROJECT = simx
 
 all: $(DESTDIR)/$(PROJECT)
-	
+
 $(DESTDIR)/$(PROJECT): $(SRCS) main.cpp
 	$(CXX) $(CXXFLAGS) -DSTARTUP_ADDR=0x80000000 $^ $(LDFLAGS) -o $@
 

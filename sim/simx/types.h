@@ -88,7 +88,7 @@ enum class TCOpType { // BAKR NOTE: more types later ( should be tied to the ins
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum class ExeType {
+enum class ExeType : uint32_t{
   ALU,
   LSU,
   FPU,

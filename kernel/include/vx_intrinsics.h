@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -119,7 +119,7 @@ inline void vx_tmc_zero() {
 inline void vx_tmc_one() {
     asm volatile (
         "li a0, 1\n\t"  // Load immediate value 1 into a0 (x10) register
-        ".insn r %0, 0, 0, x0, a0, x0" :: "i"(RISCV_CUSTOM0) 
+        ".insn r %0, 0, 0, x0, a0, x0" :: "i"(RISCV_CUSTOM0)
         : "a0"          // Indicate that a0 (x10) is clobbered
     );
 }
@@ -199,7 +199,7 @@ inline int vx_num_threads() {
 inline int vx_num_warps() {
     int ret;
     asm volatile ("csrr %0, %1" : "=r"(ret) : "i"(VX_CSR_NUM_WARPS));
-    return ret;   
+    return ret;
 }
 
 // Return the number of cores per cluster
