@@ -28,6 +28,8 @@
 
 using namespace vortex;
 
+#define PRINT_LINE(X) std::cout << __LINE__ << std::endl; X
+
 union reg_data_t {
   Word     u;
   WordI    i;
@@ -261,7 +263,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           break;
         }
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       } else {
         switch (func3) {
@@ -320,7 +322,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           break;
         }
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       }
     }
@@ -467,7 +469,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
             break;
           }
           default:
-            std::abort();
+            PRINT_LINE(std::abort();)
         }
       } else {
         switch (func3) {
@@ -507,7 +509,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           break;
         }
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       }
     }
@@ -551,7 +553,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           break;
         }
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
       }
     }
     rd_write = true;
@@ -609,7 +611,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         break;
       }
       default:
-        std::abort();
+        PRINT_LINE(std::abort();)
       }
       break; // runonce
     }
@@ -686,7 +688,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           rddata[t].u64 = read_data;
           break;
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       }
     } else {
@@ -703,7 +705,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         break;
       }
       default:
-        std::abort();
+        PRINT_LINE(std::abort();)
       }
     }
     rd_write = true;
@@ -735,7 +737,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           core_->dcache_write(&write_data, mem_addr, data_bytes);
           break;
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       }
     } else {
@@ -749,7 +751,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           break;
         }
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
       }
     }
@@ -820,7 +822,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           result = std::max(read_data_u, rs1_data_u);
           break;
         default:
-          std::abort();
+          PRINT_LINE(std::abort();)
         }
         core_->dcache_write(&result, mem_addr, data_bytes);
         rddata[t].i = read_data_i;
@@ -842,10 +844,12 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         switch (csr_addr) {
         case 0:
           // RV32I: ECALL
+            std::cout << "ECALL" << std::endl;
           core_->trigger_ecall();
           break;
         case 1:
           // RV32I: EBREAK
+          std::cout << "EBREAK" << std::endl;
           core_->trigger_ebreak();
           break;
         case 0x002: // URET
@@ -853,7 +857,8 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         case 0x302: // MRET
           break;
         default:
-          std::abort();
+          std::cout << "ABORT" << std::endl;
+          PRINT_LINE(std::abort();)
         }
       } else {
         trace->exe_type = ExeType::SFU;
@@ -1305,9 +1310,6 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
           // RV32F: FNMSUB.S
           rddata[t].u64 = nan_box(rv_fnmsub_s(check_boxing(rsdata[t][0].u64), check_boxing(rsdata[t][1].u64), check_boxing(rsdata[t][2].u64), frm, &fflags));
         break;
-      case MMA:
-        // Functional exec happens in the core
-        break ;
       default:
         break;
       }
@@ -1316,6 +1318,10 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     rd_write = true;
     break;
   }
+  case MMA : {
+    // Functional exec happens in the core
+  } break ;
+
   case EXT1: {
     switch (func7) {
     case 0: {
@@ -1358,7 +1364,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         if (is_divergent) {
           if (ipdom_stack_.size() == arch_.ipdom_size()) {
             std::cout << "IPDOM stack is full! size=" << std::dec << ipdom_stack_.size() << ", PC=0x" << std::hex << PC_ << " (#" << std::dec << trace->uuid << ")\n" << std::dec << std::flush;
-            std::abort();
+            PRINT_LINE(std::abort();)
           }
           // set new thread mask
           next_tmask = then_tmask;
@@ -1384,7 +1390,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         if (is_divergent != 0) {
           if (ipdom_stack_.empty()) {
             std::cout << "IPDOM stack is empty!\n" << std::flush;
-            std::abort();
+            PRINT_LINE(std::abort();)
           }
           next_tmask = ipdom_stack_.top().tmask;
           if (!ipdom_stack_.top().fallthrough) {
@@ -1420,11 +1426,11 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         }
       } break;
       default:
-        std::abort();
+        PRINT_LINE(std::abort();)
       }
     } break;
     default:
-      std::abort();
+      PRINT_LINE(std::abort();)
     }
   } break;
   case EXT2: {
@@ -1445,11 +1451,11 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         rd_write = true;
       } break;
       default:
-        std::abort();
+        PRINT_LINE(std::abort();)
       }
       break;
     default:
-      std::abort();
+      PRINT_LINE(std::abort();)
     }
   } break;
   case VSET: {
@@ -2297,11 +2303,11 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
       rddata[0].i = vl_;
     } break;
     default:
-      std::abort();
+      PRINT_LINE(std::abort();)
     }
   } break;
   default:
-    std::abort();
+    PRINT_LINE(std::abort();)
   }
 
   if (rd_write) {
@@ -2343,7 +2349,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
       trace->used_fregs[rdest] = 1;
       break;
     default:
-      std::abort();
+      PRINT_LINE(std::abort();)
       break;
     }
   }

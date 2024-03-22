@@ -78,7 +78,7 @@ inline std::ostream &operator<<(std::ostream &os, const RegType& type) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum class TCOpType { // BAKR NOTE: more types later ( should be tied to the instruction extension)
+enum class TCOpType :uint32_t { // BAKR NOTE: more types later ( should be tied to the instruction extension)
     ACC_REG,
     ACC_BUF,
     NO_ACC

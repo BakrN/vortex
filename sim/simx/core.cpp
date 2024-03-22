@@ -95,6 +95,7 @@ Core::Core(const SimContext& ctx,
   tc_config.output_fifo_size = TC_OUTPUT_FIFO_SIZE;
   tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
 
+  tc_operand_count = tc_config.operand_count;
   exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TensorCore>(this, tc_config);
 
   this->reset();
@@ -261,6 +262,11 @@ void Core::issue() {
       continue;
     auto trace = operand->Output.front();
     if (dispatchers_.at((int)trace->exe_type)->push(i, trace)) {
+      if(trace->exe_type == ExeType::TC && !trace->wb){
+          // issued to TC and there's no WB
+          // Therefore, I should retire trace
+          ++committed_instrs_;
+      }
       operand->Output.pop();
       trace->log_once(false);
     } else {
@@ -331,6 +337,9 @@ void Core::commit() {
     auto trace = committed_traces_.at(i);
     if (!trace)
       continue;
+    if (trace->exe_type == ExeType::TC){
+        std::cout << "HERE" << std::endl;
+    }
     committed_traces_.at(i) = nullptr;
 
     // advance to commit stage
@@ -340,6 +349,9 @@ void Core::commit() {
     // update scoreboard
     if (trace->eop) {
       if (trace->wb) {
+        if (trace->exe_type == ExeType::TC){
+            std::cout << "Scoreboard released" << std::endl;
+        }
         scoreboard_.release(trace);
       }
 
@@ -699,7 +711,10 @@ bool Core::check_exit(Word* exitcode, bool riscv_test) const {
 }
 
 bool Core::running() const {
-  return (committed_instrs_ != issued_instrs_);
+  auto& exe_unit= (exe_units_[(int)ExeType::TC]);
+  auto& tc = static_cast<TensorCore&>(*exe_unit);
+  auto& dispatch = dispatchers_[(int)ExeType::TC];
+  return (committed_instrs_ != issued_instrs_) || tc.isBusy() || dispatch->processing();
 }
 
 void Core::resume() {

@@ -2,6 +2,7 @@
 #define TENSOR_CORE_H
 #include "exe_unit.h"
 #include "pipeline.h"
+#include "types.h"
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
@@ -106,45 +107,96 @@ struct MATMetadata {
       uint16_t rd;
   };
 
+template <typename T>
+class ChunkVector{
+    public:
+        ChunkVector(int chunk_width, int num_chunks) : num_chunks(num_chunks), chunk_width(chunk_width) {
+            chunks.resize(num_chunks);
+        }
+
+        void insert( T data, int chunk=-1) {
+            [[unlikely]]
+            if (chunk <0) {
+                for (auto& e: chunks){
+                    if (e.size() < chunk_width){
+                        e.push_back(data);
+                        return ;
+                    }
+                }
+                // raise error here. ALL FULL
+                assert(0);
+            }
+            else {
+                assert(chunks[chunk].size() < chunk_width);
+                chunks[chunk].push_back(data);
+            }
+        }
+
+        // Shift chunks to the right
+        void shiftRight() {
+
+            assert(isFull()) ; // Before shifting make sure all chunks are full
+            for (int i = 0 ; i < num_chunks-1; i++) {
+                auto vec = chunks[num_chunks-1];
+                chunks.erase(chunks.end());
+                chunks.insert(chunks.begin(), vec);
+            }
+        }
+
+        bool isFull() const {
+            for (auto& e: chunks){
+                if ((int)e.size() < chunk_width){
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        T get(int index, int chunk) {
+            return chunks[chunk][index];
+        }
+
+        T get(int index) {
+            return chunks[index / chunk_width][index % chunk_width];
+        }
+
+
+    private:
+        int num_chunks;
+        int chunk_width;
+        std::vector<std::vector<T>> chunks;
+};
 
 template <typename T>
 class MATBuffer{
 public:
-  MATBuffer(size_t width, size_t max_depth) : m_width(width), m_max_depth(max_depth), m_rows(0) {}
+  MATBuffer(size_t width, size_t max_depth, size_t num_regs=1) : m_width(width), m_max_depth(max_depth), m_rows(0) , num_regs(num_regs) {}
   MATBuffer() {}
   ~MATBuffer(){ }
 
     // Checks if the top row is full
-  bool isTopFull() const { return m_data.front().second.size() == m_width; }
+  bool isTopFull() const { return m_data.front().second.isFull(); }
 
   bool isEmpty() const { return m_data.empty(); }
 
   bool isFull() const { return m_max_depth >= m_rows && isBackFull(); }
 
   void allocateRow(MATMetadata meta){
-      m_data.push({meta,{}});
+      m_data.push({meta,ChunkVector<T>(m_width,num_regs)});
       m_rows++;
   }
 
   // Attempts to insert a value
-  void insert(const T& value) {
+  void insert(const T& value, int reg=-1) {
     if (m_rows >= m_max_depth&& isTopFull()) {
       throw std::runtime_error("Structure is full");
     }
 
-    m_data.front().second.push_back(value);
+    m_data.front().second.insert(value, reg );
   }
 
   std::vector<T>& frontRow() { return m_data.front().second; }
   MATMetadata& frontMeta() { return m_data.front().first; }
-
-  T& front() {
-    if (m_data.empty()) {
-      throw std::runtime_error("Structure is empty");
-    }
-
-    return m_data.front().second.front();
-  }
 
   void popRow() {
     if (m_data.empty()) {
@@ -154,22 +206,22 @@ public:
     m_rows--;
   }
 
+  auto depth(){
+      return m_rows;
+  }
+
   bool  isBackFull() const {
       if (m_data.empty())
         return false;
-      return m_data.back().second.size() == m_width; }
+      return m_data.back().second.isFull(); }
+  bool isBackEmpty() const { return m_data.empty() || m_data.back().second.empty(); }
 
   int width() const { return m_width; }
 
 
   // For shift operations used in matrix B
   void shiftRight(){
-      T temp = m_data.front().second[0] ;
-      for (uint i =0 ; i < m_width; i++){
-          auto tmp = m_data.front().second[(i+1) % m_width];
-          m_data.front().second[(i+1) % m_width] = temp;
-          temp = tmp;
-      }
+      m_data.front().second.shiftRight();
   }
 
 
@@ -177,7 +229,8 @@ private:
   size_t m_width;
   size_t m_max_depth;
   size_t m_rows; // Number of rows with data
-  std::queue<std::pair<MATMetadata, std::vector<T>>> m_data;
+  size_t num_regs;
+  std::queue<std::pair<MATMetadata, ChunkVector<T>>> m_data;
 
 };
 
@@ -236,8 +289,8 @@ class PEGroup {
             );
         ~PEGroup();
 
-        bool spaceToAccept() {
-            return !(m_mat_a.isFull() ||  m_mat_b.isFull() ||m_mat_c.isFull());
+        bool spaceToAccept(int wid ) {
+            return !(m_mat_a[wid].isFull() ||  m_mat_b[wid].isFull() ||m_mat_c[wid].isFull());
         }
 
         size_t getNumPEs() {return m_num_pes; };
@@ -245,14 +298,6 @@ class PEGroup {
         bool spaceInOutput(size_t pe_id=0) {
             return !m_output_fifo[pe_id].isFull();
         }
-
-        void loadMatA( const std::vector<uint16_t>& data);
-        void loadMatB(const std::vector<uint16_t>& data);
-        void loadAccBuf(const std::vector<uint32_t>& data);
-
-        void loadMatA(uint16_t);
-        void loadMatB(uint16_t);
-        void loadAccBuf(uint32_t);
 
 
         void setAccMat(size_t row, size_t col, uint32_t data);
@@ -265,29 +310,29 @@ class PEGroup {
 
 
 
-        void popOperands() ;
+        void popOperands(int wid) ;
 
-        void allocateRow(MATMetadata meta){
-            m_mat_a.allocateRow(meta);
-            m_mat_b.allocateRow(meta);
-            m_mat_c.allocateRow(meta);
+        void allocateRow(MATMetadata meta, int wid){
+            m_mat_a[wid].allocateRow(meta);
+            m_mat_b[wid].allocateRow(meta);
+            m_mat_c[wid].allocateRow(meta);
         }
 
-        bool isReadyToFire() {
-            auto& meta = m_mat_b.frontMeta(); // allocate meta data in b (stepping will change it)
+        bool isReadyToFire(int wid) {
+            auto& meta = m_mat_b[wid].frontMeta(); // allocate meta data in b (stepping will change it)
 
-            return m_mat_a.isTopFull() && m_mat_b.isTopFull() && m_mat_c.isTopFull() && // operands available
+            return m_mat_a[wid].isTopFull() && m_mat_b[wid].isTopFull() && m_mat_c[wid].isTopFull() && // operands available
             (meta.wb ? !m_output_fifo[0].isFull() : true);
         }
 
-        uint32_t step() {
-            m_mat_b.shiftRight();
-            m_mat_b.frontMeta().rd++;
-            return ++m_cur_step;
+        uint32_t step(int wid) {
+            m_mat_b[wid].shiftRight();
+            m_mat_b[wid].frontMeta().rd++;
+            return ++m_cur_step[wid];
         };
 
-        uint32_t getStep() {
-            return m_cur_step ;
+        uint32_t getStep(int wid) {
+            return m_cur_step[wid] ;
         }
 
 
@@ -295,23 +340,23 @@ class PEGroup {
             for (auto& e: m_output_fifo)
                 e.reserve();
         }
-        MATBuffer<uint16_t>& mata  () { return m_mat_a; }
-        MATBuffer<uint16_t>& matb  () { return m_mat_b; }
-        MATBuffer<uint32_t>& matc  () { return m_mat_c; }
+        MATBuffer<uint16_t>& mata  (int wid) { return m_mat_a[wid]; }
+        MATBuffer<uint16_t>& matb  (int wid) { return m_mat_b[wid]; }
+        MATBuffer<uint32_t>& matc  (int wid) { return m_mat_c[wid]; }
         FIFO<std::tuple<uint32_t, uint16_t, uint32_t>>& getOutputFIFO(size_t pe) { return m_output_fifo[pe]; }
 
 
     private:
 
-        MATBuffer<uint16_t> m_mat_a;
-        MATBuffer<uint16_t> m_mat_b;
-        MATBuffer<uint32_t> m_mat_c;
+        MATBuffer<uint16_t> m_mat_a[MAX_NUM_WARPS]; // max number of warps
+        MATBuffer<uint16_t> m_mat_b[MAX_NUM_WARPS];
+        MATBuffer<uint32_t> m_mat_c[MAX_NUM_WARPS];
         AccBuffer<uint32_t> m_tile_accumulator;
 
         std::vector<FIFO<std::tuple<uint32_t, uint16_t, uint32_t>>> m_output_fifo; // 1 per PE (warp_id, reg, val)
 
         size_t m_num_pes;
-        size_t m_cur_step = 0;
+        size_t m_cur_step[MAX_NUM_WARPS] ;
 
         bool readyToFire = false;
 
@@ -350,6 +395,7 @@ class TensorCore : public vortex::ExeUnit{
         };
         TensorCore(const SimContext& ctx, vortex::Core*, Config_t config);
         void tick();
+        bool isBusy() ;
 
     private:
         // Ticks functions

@@ -196,6 +196,9 @@ private:
 
   uint32_t commit_exe_;
 
+  uint64_t tc_loads_ = 0 ;
+  uint64_t tc_operand_count = 0 ;
+
   friend class Warp;
   friend class LsuUnit;
   friend class AluUnit;

@@ -121,6 +121,9 @@ public:
     , wid(rhs.wid)
     , tmask(rhs.tmask)
     , PC(rhs.PC)
+    , rsrc1(rhs.rsrc1)
+    , rsrc2(rhs.rsrc2)
+    , rsrc3(rhs.rsrc3)
     , rdest(rhs.rdest)
     , rdest_type(rhs.rdest_type)
     , wb(rhs.wb)
@@ -135,6 +138,7 @@ public:
     , eop(rhs.eop)
     , fetch_stall(rhs.fetch_stall)
     , log_once_(false)
+
   {}
 
   ~pipeline_trace_t() {}

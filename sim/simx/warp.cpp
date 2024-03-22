@@ -95,6 +95,20 @@ pipeline_trace_t* Warp::eval() {
   trace->rdest = instr->getRDest();
   trace->rdest_type = instr->getRDType();
 
+  if (instr->getOpcode() == Opcode::MMA) {
+    trace->exe_type = ExeType::TC;
+    trace->wb = trace->rdest_type == RegType::Float ? true : false;
+    if (instr->getNRSrc() > 2) {  // acc
+        if (instr->getRSType(2) == RegType::Float) {
+            trace->tc_type = TCOpType::ACC_REG;
+        } else if (instr->getRSType(2) == RegType::TC) {
+            trace->tc_type = TCOpType::ACC_BUF;
+        }
+    } else {
+        trace->tc_type = TCOpType::NO_ACC;
+    }
+  }
+
   trace->rsrc1 = instr->getRSrc(0);
   if (instr->getNRSrc() > 1) {
     trace->rsrc2 = instr->getRSrc(1);
@@ -103,9 +117,6 @@ pipeline_trace_t* Warp::eval() {
     trace->rsrc3 = instr->getRSrc(2);
   }
 
-  if (instr->getOpcode() == Opcode::MMA) {
-    trace->exe_type = ExeType::TC;
-  }
 
 
   // Execute

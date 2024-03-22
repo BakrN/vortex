@@ -387,6 +387,7 @@ static const char* op_string(const Instr &instr) {
   case Opcode::FMNMADD: return func2 ? "FNMADD.D" : "FNMADD.S";
   case Opcode::FMNMSUB: return func2 ? "FNMSUB.D" : "FNMSUB.S";
   case Opcode::VSET:    return "VSET";
+  case Opcode::MMA:     return "MMA";
   case Opcode::EXT1:
     switch (func7) {
     case 0:
@@ -724,22 +725,32 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         std::abort();
       }
     } else if (op == Opcode::MMA) {
+        std::cout << "MMA Instruction: " ;
         // using sam
         instr->addSrcReg(rs1 , RegType::Float);
         instr->addSrcReg(rs2 , RegType::Float);
+        std::cout << " src1: " << rs1 << " src2: " << rs2 ;
+        std::cout << " wb: ";
         if (func3 == 0) { // (determine wb destination) (0: reg file , 1: TC)
             instr->setDestReg(rd, RegType::Float);
+            std::cout << "reg file " ;
         } else {
             instr->setDestReg(rd, RegType::TC);
+            std::cout << "tc buf " ;
         }
+        std::cout << " acc_source: ";
         if (func2 == 0) {
+            std::cout << "none " ;
             // no accumulation source
         } else if (func2 ==1) {
             // accumulation source is register
+            std::cout << "reg file " ;
             instr->addSrcReg(rs3, RegType::Float);
         } else {
+            std::cout << "acc buffer " ;
             instr->addSrcReg(rs3, RegType::TC);
         }
+        std::cout << std::endl ;
 
         instr->setFunc2(func2);
         instr->setFunc3(func3);

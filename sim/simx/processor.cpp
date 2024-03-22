@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,7 +16,7 @@
 
 using namespace vortex;
 
-ProcessorImpl::ProcessorImpl(const Arch& arch) 
+ProcessorImpl::ProcessorImpl(const Arch& arch)
   : arch_(arch)
   , clusters_(arch.num_clusters())
 {
@@ -35,18 +35,18 @@ ProcessorImpl::ProcessorImpl(const Arch& arch)
     log2ceil(MEM_BLOCK_SIZE), // B
     log2ceil(L3_NUM_WAYS),  // W
     0,                      // A
-    XLEN,                   // address bits  
+    XLEN,                   // address bits
     L3_NUM_BANKS,           // number of banks
     1,                      // number of ports
-    uint8_t(arch.num_clusters()), // request size 
+    uint8_t(arch.num_clusters()), // request size
     true,                   // write-through
     false,                  // write response
     0,                      // victim size
     L3_MSHR_SIZE,           // mshr
     2,                      // pipeline latency
     }
-  );        
-  
+  );
+
   // connect L3 memory ports
   l3cache_->MemReqPort.bind(&memsim_->MemReqPort);
   memsim_->MemRspPort.bind(&l3cache_->MemRspPort);
@@ -87,7 +87,7 @@ void ProcessorImpl::attach_ram(RAM* ram) {
 int ProcessorImpl::run(bool riscv_test) {
   SimPlatform::instance().reset();
   this->reset();
-  
+
   bool done;
   Word exitcode = 0;
   do {
@@ -95,7 +95,7 @@ int ProcessorImpl::run(bool riscv_test) {
     done = true;
     for (auto cluster : clusters_) {
       if (cluster->running()) {
-        Word ec;   
+        Word ec;
         if (cluster->check_exit(&ec, riscv_test)) {
           exitcode |= ec;
         } else {
@@ -104,11 +104,11 @@ int ProcessorImpl::run(bool riscv_test) {
       }
     }
     perf_mem_latency_ += perf_mem_pending_reads_;
-  } while (!done);
+  } while (!done || SimPlatform::instance().processing());
 
   return exitcode;
 }
- 
+
 void ProcessorImpl::reset() {
   perf_mem_reads_ = 0;
   perf_mem_writes_ = 0;
@@ -128,13 +128,13 @@ ProcessorImpl::PerfStats ProcessorImpl::perf_stats() const {
   perf.l3cache     = l3cache_->perf_stats();
   for (auto cluster : clusters_) {
     perf.clusters += cluster->perf_stats();
-  }   
+  }
   return perf;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-Processor::Processor(const Arch& arch) 
+Processor::Processor(const Arch& arch)
   : impl_(new ProcessorImpl(arch))
 {}
 

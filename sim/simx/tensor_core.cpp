@@ -1,4 +1,5 @@
 #include "tensor_core.h"
+#include "VX_config.h"
 #include "pipeline.h"
 #include "core.h"
 #include "types.h"
@@ -106,43 +107,18 @@ uint32_t float32_to_uint32(float value) {
 }
 
 PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t acc_buf_rows, size_t acc_buf_cols, size_t output_fifo_size, size_t num_acc_tiles)  :
-    m_mat_a(num_pes * operands_count, input_mat_buf_depth),
-    m_mat_b(operands_count*num_pes, input_mat_buf_depth),
-    m_mat_c(num_pes, input_mat_buf_depth) , // Due to stepping mechanism, load num_pes per group
     m_tile_accumulator(acc_buf_rows,acc_buf_cols, num_acc_tiles),
     m_num_pes(num_pes)
 {
+    for (int i = 0 ; i < MAX_NUM_WARPS; i++) {
+        m_mat_a[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
+        m_mat_b[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
+        m_mat_c[i] = MATBuffer<uint32_t>(num_pes, input_mat_buf_depth,num_pes);
+        m_cur_step[i] = 0;
+    }
     for (size_t i = 0; i < num_pes; i++) {
         m_output_fifo.emplace_back(FIFO<std::tuple<uint32_t, uint16_t, uint32_t>>(output_fifo_size));
     }
-}
-
-void PEGroup::loadMatA(const std::vector<uint16_t>& data){
-    for (auto& e: data)
-        m_mat_a.insert(e);
-}
-
-void PEGroup::loadMatA(uint16_t e){
-    m_mat_a.insert(e);
-}
-
-
-void PEGroup::loadMatB( const std::vector<uint16_t>& data){
-    for (auto& e: data)
-        m_mat_b.insert(e);
-}
-
-void PEGroup::loadMatB(uint16_t e){
-    m_mat_b.insert(e);
-}
-
-void PEGroup::loadAccBuf(const std::vector<uint32_t>& data) {
-    for (auto& e: data)
-        m_mat_c.insert(e);
-}
-
-void PEGroup::loadAccBuf(uint32_t e){
-    m_mat_c.insert(e);
 }
 
 void PEGroup::insertOutput(size_t pe_id,uint32_t warp_id,  uint16_t reg, uint32_t val){
@@ -151,11 +127,11 @@ void PEGroup::insertOutput(size_t pe_id,uint32_t warp_id,  uint16_t reg, uint32_
 std::tuple<uint32_t , uint16_t, uint32_t> PEGroup::popOutput(size_t pe_id){
     return m_output_fifo[pe_id].pop();
 }
-void PEGroup::popOperands() {
-    m_mat_a.popRow();
-    m_mat_b.popRow();
-    m_mat_c.popRow();
-    m_cur_step = 0 ;
+void PEGroup::popOperands(int wid) {
+    m_mat_a[wid].popRow();
+    m_mat_b[wid].popRow();
+    m_mat_c[wid].popRow();
+    m_cur_step[wid] = 0 ;
 }
 
 void PEGroup::setAccMat(size_t row, size_t col, uint32_t data){
@@ -179,45 +155,68 @@ TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t confi
     }
 }
 
+bool TensorCore::isBusy() {
+    bool busy = false;
+    for (int i = 0 ; i < ISSUE_WIDTH; i++) {
+        busy |= !Inputs.at(i).empty();
+        busy |= !Outputs.at(i).empty();
+    }
+    // all other queues in here are empty
+    busy |= !m_timing.empty();
+    busy |= !m_traces.empty();
+
+    // only need to check 1 pe group
+    for (int i = 0 ; i < MAX_NUM_WARPS;i++)
+        busy |= !m_pe_groups[0].mata(i).isEmpty();
+    busy |= !m_pe_groups[0].getOutputFIFO(0).isEmpty();
+
+    return busy;
+}
+
 void TensorCore::handleInput(){
     for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
         // Handle inputs
-        bool recieved_input = false;
-        auto& input= Inputs.at(i) ; // retire trace
+        auto& input= Inputs.at(i) ;
+        if (input.empty()) {
+            continue;
+        }
 
+        vortex::pipeline_trace_t* trace = input.front();
         bool space_to_accept = true;
         for (size_t i = 0 ; i < m_pe_groups.size(); i++) {
-            space_to_accept &= m_pe_groups[i].spaceToAccept();
+            space_to_accept &= m_pe_groups[i].spaceToAccept(trace->wid);
         }
+
+        static int count = 0;
         [[unlikely]]
-        if (!input.empty() && !recieved_input && space_to_accept) { // and there is space in buffers
-            recieved_input = true;
-            vortex::pipeline_trace_t* trace = input.front();
+        if (space_to_accept) { // and there is space in buffers
+            std:: cout << "Accepted input(" << count++ << "): " << *trace << std::endl;
             input.pop();
-            // Load Inputs (assumption 1 in play)
+            // Load Inputs (assumption parallel loading)
+            auto wid = trace->wid;
             auto& warp = core_->warps_[trace->wid]; // can't handle multiple independent data streams for now (per row in matrix buffers can add warp tag) (also independent matrix tile buffers)
 
             for (size_t t = 0 ; t < trace->tmask.count() ; t++) {
+                if (!trace->tmask.test(t)) {
+                    continue;
+                }
                 std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
                 std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
-                uint32_t c ;
+                uint32_t c =0;
                 auto grp = t % m_pe_groups.size();
+                auto& pe_grp = m_pe_groups[grp];
                 // find first N(=2) operands of A and B and possible c depending on type
 
-                c = 0 ;
-                if (trace->tc_type != vortex::TCOpType::NO_ACC) {
-                    [[likely]]
-                    if (trace->tc_type == vortex::TCOpType::ACC_REG) {
-                        c = warp->freg_file_.at(t)[trace->rsrc3];
-                        // fetch from mat tile accumulator
-                    }
-                    else  {
-                        // use mat accumulate buffer
-                        // fetch from accumulate buffer
-                        auto row = 0; // row is dependent on tid
-                        auto col = trace->rsrc3;
-                        c = m_pe_groups[grp].getAccMat(row, col);
-                    }
+                if (trace->tc_type == vortex::TCOpType::ACC_REG) {
+                    c = warp->freg_file_.at(t)[trace->rsrc3];
+
+                }
+                else if(trace->tc_type == vortex::TCOpType::ACC_BUF) {
+                    // fetch from mat tile accumulator
+                    auto row = 0; // row is dependent on tid
+                    auto col = trace->rsrc3;
+                    c = m_pe_groups[grp].getAccMat(row, col);
+                    pe_grp.matc(wid).insert(c);
                 }
 
                 uint32_t a_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc1];
@@ -229,59 +228,67 @@ void TensorCore::handleInput(){
                 B.first = (b_val & 0xFFFF0000) >> 16;
                 B.second = b_val & 0xFFFF ;
 
-                if (m_pe_groups[grp].mata().isBackFull()){
+                if (pe_grp.mata(wid).isBackFull() || pe_grp.mata(wid).isEmpty()){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[grp].mata().allocateRow(meta);
+                    pe_grp.mata(wid).allocateRow(meta);
                 }
 
-                if (m_pe_groups[grp].matb().isBackFull()){
+                if (pe_grp.matb(wid).isBackFull() || pe_grp.matb(wid).isEmpty() ){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[grp].matb().allocateRow(meta);
+                    pe_grp.matb(wid).allocateRow(meta);
                 }
 
-                if (m_pe_groups[grp].matc().isBackFull()){
+                if (pe_grp.matc(wid).isBackFull() || pe_grp.matc(wid).isEmpty()){
                     MATMetadata meta;
                     meta.wb = trace->wb;
                     meta.warp_id = trace->wid;
                     meta.rd = trace->rdest;
-                    m_pe_groups[grp].matc().allocateRow(meta);
+                    pe_grp.matc(wid).allocateRow(meta);
                 }
 
-                m_pe_groups[grp].loadMatA(A.first);
-                m_pe_groups[grp].loadMatA(A.second);
+                auto pe = t % m_config.num_pes;
+                pe_grp.mata(wid).insert(A.first, pe );
+                pe_grp.mata(wid).insert(A.second,pe );
 
-                m_pe_groups[grp].loadMatB(B.first);
-                m_pe_groups[grp].loadMatB(B.second);
+                pe_grp.matb(wid).insert(B.first, pe);
+                pe_grp.matb(wid).insert(B.second, pe);
 
-                m_pe_groups[grp].loadAccBuf(c);
-                }
+
+            }
+
                 // queue up trace if it fills up row and wb
                 // Only valid with parallel loading
                 bool add_trace = true;
                 for (size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
-                    if (!(m_pe_groups[grp].mata().isBackFull() && m_pe_groups[grp].matb().isBackFull() && m_pe_groups[grp].matc().isBackFull())) {
+                    if (m_pe_groups[grp].mata(wid).isBackFull() && m_pe_groups[grp].matb(wid).isBackFull() && !m_pe_groups[grp].matc(wid).isBackFull() && m_pe_groups[grp].matc(wid).depth() < m_pe_groups[grp].mata(wid).depth()){
+                        // if a and b are fully loaded and c isn't then fill rest of c with 0s (no acc) (assert c if empty otherwise there has been an error)
+                        assert(m_pe_groups[grp].matc(wid).isBackEmpty());
+                        while (!m_pe_groups[grp].matc(wid).isBackFull()) {
+                            m_pe_groups[grp].matc(wid).insert(0);
+                        }
+                    }
+                    if (!(m_pe_groups[grp].mata(wid).isBackFull() && m_pe_groups[grp].matb(wid).isBackFull() && m_pe_groups[grp].matc(wid).isBackFull())) {
                         add_trace = false;
                         break;
                     }
                 }
                 if (add_trace) {
+                    std::cout << "Fully loaded" << std::endl;
                     m_traces.push(trace);
                 }
             }
             // accept
         }
-
-
-
 }
 
 void TensorCore::compute(){
+    /*
     for(size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
         if (m_pe_groups[grp].matb().isTopFull() && m_pe_groups[grp].getStep() == m_config.num_pes){
             m_pe_groups[grp].popOperands();
@@ -324,6 +331,7 @@ void TensorCore::compute(){
             m_pe_groups[grp].step();
         }
     }
+    */
 }
 
 void TensorCore::queueToOutput(){
@@ -362,7 +370,9 @@ void TensorCore::drainOutQueue(){
     if (commit) {
         vortex::pipeline_trace_t* trace = m_traces.front();
         m_traces.pop();
-        Outputs.at(0).send(trace,1 );
+        if (trace->rdest_type == vortex::RegType::Float) {
+            Outputs.at(0).send(trace,1 );
+        }
     }
 }
 
@@ -370,9 +380,10 @@ void TensorCore::tick() {
     // FOR NOW I ASSUME PARALLEL LOADING (all pe groups are loaded at same time so only need to look at 1 group) (assumption 1)
     // Ensure all threads are synchronized before doing MMA instruction
 
-    drainOutQueue();
-    queueToOutput();
-    compute();
+    //drainOutQueue();
+    //queueToOutput();
+    //compute();
+
     handleInput();
 
     m_cycle+= 1;
