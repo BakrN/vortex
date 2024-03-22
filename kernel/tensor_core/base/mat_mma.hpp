@@ -23,8 +23,8 @@ enum class WriteBack_t : uint8_t {
 // MAT MMA WRITE BACK TO REG FILE
 
 
-template< Acc_t acc_src>
-void mat_mma_wb(float* A , float* B , float* C, float* result) { // write back to reg file without accumulation
+template< Acc_t acc_src, int dest_reg>
+inline void mat_mma_wb(float* A , float* B , float* C, float* result) { // write back to reg file without accumulation
     asm volatile(".insn r4 %[EXT], %[rd], %[func3], %[rs1], %[rs2], %[func2], %[rs3]" :
             [rd] "=r" (*result) :
             [EXT] "i" (TC_EXT) ,
@@ -37,7 +37,7 @@ void mat_mma_wb(float* A , float* B , float* C, float* result) { // write back t
 }
 
 template< Acc_t acc_src>
-void mat_mma(float* A , float* B , float* C, int result=-1){ // mat mma  with on writeback
+inline void mat_mma(float* A , float* B , float* C, int result=-1){ // mat mma  with on writeback
     asm volatile(".insn r4 %[EXT], %[rd], %[func3], %[rs1], %[rs2], %[func2], %[rs3]" ::
             [rd] "i" (result),
             [EXT] "i" (TC_EXT) ,

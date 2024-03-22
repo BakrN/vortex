@@ -18,13 +18,12 @@ int main() {
     //         [rs3] "f" ("f4")
     //         :  "f16" ) ;
 
-    //asm volatile(".insn r4 0x7B, 16, 0, 0, 0, 1, 4");
-    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(RISCV_CUSTOM1) : "f16") ;
+    // //asm volatile(".insn r4 0x7B, 16, 0, 0, 0, 1, 4"); func2,func3
 
-    // ext Func2, func3 , rd, rs1, rs2, rs3
+    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
+    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
+    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
+    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
 
-
-
-    // try half thread masking
     return 0 ;
 }

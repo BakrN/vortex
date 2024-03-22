@@ -1,4 +1,6 @@
-#pragma once
+#ifndef MAT_LOAD_HPP
+#define MAT_LOAD_HPP
+
 #include <cstdio>
 #include <vx_print.h>
 
@@ -157,3 +159,5 @@ inline void tc_load(Res_t* A, Res_t* B, Res_t* C, Res_t* regA, Res_t* regB, Res_
     //    printf("regC[%d] = %f\n", i, regC[i]);
     //}
 }
+
+#endif
