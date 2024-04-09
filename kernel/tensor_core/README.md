@@ -78,6 +78,10 @@ for (i = 0; i < M; i += tileSizeRow)		// unrolled over threadgroups (A or B can 
 		for (acc_tile = 0 ; i < num; acc_tile++)
 			D[i...][j...] = mat_tile_accumulate[acc_tile][i...][j...]; // assign block (store)
 ```
+# TO BE IMPLEMENTED IDEAS
+
+Support for partion thread masks. -> Idea is share physical compute units over threads...
+Thread mask. In simx, need to when commit have tmask on only commit once all ouutput fifos are full...
 
 # Appendix
 (how to avoid conflict when loading from different warps? Have a TC Controller accept it) ( I will need a TC controller if I want multiple waves to overlap) (setup latency okay as long as it doesn't take To be in steady state, loading_latency < steps

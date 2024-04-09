@@ -24,14 +24,22 @@ SIM_DIR = ../../sim
 
 CFLAGS += -O3 -mcmodel=medany -fno-exceptions -nostartfiles -fdata-sections -ffunction-sections -std=c++17
 CFLAGS += -I$(VORTEX_KN_PATH)/include -I$(VORTEX_KN_PATH)/../hw
+EXTFLAGS=""
 
 LDFLAGS += -lm -Wl,-Bstatic,--gc-sections,-T,$(VORTEX_KN_PATH)/linker/vx_link$(XLEN).ld,--defsym=STARTUP_ADDR=0x80000000 $(VORTEX_KN_PATH)/libvortexrt.a
 
 PROJECT = GEMM
 
-SRCS = mat_kernel.cpp # kernel.cpp
+VXSRCS = kernel.cpp # mat_kernel.cpp # kernel.cpp
+
+SRCS = main.cpp
+
+
+
 
 all: $(PROJECT).elf $(PROJECT).bin $(PROJECT).dump $(PROJECT).s
+
+
 
 $(PROJECT).dump: $(PROJECT).elf
 	$(DP) -D $(PROJECT).elf > $(PROJECT).dump
@@ -39,11 +47,8 @@ $(PROJECT).dump: $(PROJECT).elf
 $(PROJECT).bin: $(PROJECT).elf
 	$(CP) -O binary $(PROJECT).elf $(PROJECT).bin
 
-$(PROJECT).elf: $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) $(LDFLAGS) -o $(PROJECT).elf
-
-$(PROJECT).s: $(SRCS)
-	$(CC) $(CFLAGS) -S $(SRCS) $(LDFLAGS) -o $(PROJECT).s
+$(PROJECT).elf: $(VXSRCS)
+	$(CC) $(CFLAGS) $(EXTFLAGS) $(VXSRCS) $(LDFLAGS) -o $(PROJECT).elf
 
 run-rtlsim: $(PROJECT).bin
 	$(SIM_DIR)/rtlsim/rtlsim $(PROJECT).bin
@@ -51,9 +56,9 @@ run-rtlsim: $(PROJECT).bin
 run-simx: $(PROJECT).bin
 	gdb --args $(SIM_DIR)/simx/simx  $(PROJECT).bin -c 1 -w 1 -t 4
 out-asm:
-	$(CC) $(CFLAGS) $(SRCS) $(LDFLAGS) -S -o $(PROJECT).s
+	$(CC) $(CFLAGS) $(VXSRCS) $(LDFLAGS) -S -o $(PROJECT).s
 
-.depend: $(SRCS)
+.depend: $(VXSRCS)
 	$(CC) $(CFLAGS) -MM $^ > .depend;
 
 clean:

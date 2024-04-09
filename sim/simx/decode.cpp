@@ -731,12 +731,15 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         instr->addSrcReg(rs2 , RegType::Float);
         std::cout << " src1: " << rs1 << " src2: " << rs2 ;
         std::cout << " wb: ";
-        if (func3 == 0) { // (determine wb destination) (0: reg file , 1: TC)
+
+        if (func3 ==0 ) { // (determine wb destination) (0: loading , 1: TC, 2: Acc buffer)
+            std::cout << " loading phase " ;
+        } else if (func3 == 1) {
             instr->setDestReg(rd, RegType::Float);
-            std::cout << "reg file " ;
-        } else {
+            std::cout << " reg file " << rd ;
+        } else if (func3==2) {
             instr->setDestReg(rd, RegType::TC);
-            std::cout << "tc buf " ;
+            std::cout << "tc buf " << rd ;
         }
         std::cout << " acc_source: ";
         if (func2 == 0) {

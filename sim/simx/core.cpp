@@ -76,7 +76,7 @@ Core::Core(const SimContext& ctx,
   dispatchers_.at((int)ExeType::FPU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, NUM_FPU_BLOCKS, NUM_FPU_LANES);
   dispatchers_.at((int)ExeType::LSU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_LSU_LANES);
   dispatchers_.at((int)ExeType::SFU) = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, NUM_SFU_LANES);
-  dispatchers_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<Dispatcher>(arch, 2, 1, TC_NUM_PES);
+  dispatchers_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<Dispatcher>(arch, 2, TC_NUM_PE_GROUPS, std::min(TC_NUM_PES*TC_NUM_PE_GROUPS, (int)arch.num_threads()));
 
   // initialize execute units
   exe_units_.at((int)ExeType::ALU) = SimPlatform::instance().create_object<AluUnit>(this);
@@ -181,7 +181,8 @@ void Core::schedule() {
   // advance to fetch stage
   fetch_latch_.push(trace);
   ++issued_instrs_;
-}
+
+  }
 
 void Core::fetch() {
   perf_stats_.ifetch_latency += pending_ifetches_;
@@ -262,9 +263,8 @@ void Core::issue() {
       continue;
     auto trace = operand->Output.front();
     if (dispatchers_.at((int)trace->exe_type)->push(i, trace)) {
-      if(trace->exe_type == ExeType::TC && !trace->wb){
-          // issued to TC and there's no WB
-          // Therefore, I should retire trace
+      if(trace->exe_type == ExeType::TC && !trace->wb && trace->eop){
+          // .. dispatched here
           ++committed_instrs_;
       }
       operand->Output.pop();
@@ -714,6 +714,7 @@ bool Core::running() const {
   auto& exe_unit= (exe_units_[(int)ExeType::TC]);
   auto& tc = static_cast<TensorCore&>(*exe_unit);
   auto& dispatch = dispatchers_[(int)ExeType::TC];
+  //std::cout << "committed_instrs_ " << committed_instrs_ << " issued_instrs_ " << issued_instrs_ << " tc.isBusy() " << tc.isBusy() << " dispatch->processing() " << dispatch->processing() << std::endl;
   return (committed_instrs_ != issued_instrs_) || tc.isBusy() || dispatch->processing();
 }
 

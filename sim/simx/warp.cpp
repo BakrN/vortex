@@ -98,6 +98,7 @@ pipeline_trace_t* Warp::eval() {
   if (instr->getOpcode() == Opcode::MMA) {
     trace->exe_type = ExeType::TC;
     trace->wb = trace->rdest_type == RegType::Float ? true : false;
+
     if (instr->getNRSrc() > 2) {  // acc
         if (instr->getRSType(2) == RegType::Float) {
             trace->tc_type = TCOpType::ACC_REG;

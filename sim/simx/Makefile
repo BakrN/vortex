@@ -10,9 +10,14 @@ CXXFLAGS += -I$(THIRD_PARTY_DIR)/softfloat/source/include
 CXXFLAGS += -I$(THIRD_PARTY_DIR)
 CXXFLAGS += -DXLEN_$(XLEN)
 CXXFLAGS += $(CONFIGS)
+EXTFLAGS += ""
+
 
 LDFLAGS += $(THIRD_PARTY_DIR)/softfloat/build/Linux-x86_64-GCC/softfloat.a
 LDFLAGS += -L$(THIRD_PARTY_DIR)/ramulator -lramulator
+
+CXXFLAGS += -I/opt/fmt/include
+LDFLAGS += -L/opt/fmt/lib -lfmt
 
 SRCS = ../common/util.cpp ../common/mem.cpp ../common/rvfloats.cpp
 SRCS += processor.cpp cluster.cpp core.cpp warp.cpp decode.cpp execute.cpp exe_unit.cpp cache_sim.cpp mem_sim.cpp shared_mem.cpp dcrs.cpp tensor_core.cpp
@@ -22,7 +27,7 @@ ifdef DEBUG
 	CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG)
 	#CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG) -fsanitize=address -fno-omit-frame-pointer
 else
-	CXXFLAGS +=  -O2 -DNDEBUG
+	CXXFLAGS +=  -g -DNDEBUG # -O2 -DNDEBUG
 endif
 
 PROJECT = simx
@@ -30,10 +35,10 @@ PROJECT = simx
 all: $(DESTDIR)/$(PROJECT)
 
 $(DESTDIR)/$(PROJECT): $(SRCS) main.cpp
-	$(CXX) $(CXXFLAGS) -DSTARTUP_ADDR=0x80000000 $^ $(LDFLAGS) -o $@
+	$(CXX) $(CXXFLAGS) $(EXTFLAGS) -DSTARTUP_ADDR=0x80000000 $^ $(LDFLAGS) -o $@
 
 $(DESTDIR)/lib$(PROJECT).so: $(SRCS)
-	$(CXX) $(CXXFLAGS) $^ -shared $(LDFLAGS) -o $@
+	$(CXX) $(CXXFLAGS) $(EXTFLAGS) $^ -shared $(LDFLAGS) -o $@
 
 .depend: $(SRCS)
 	$(CXX) $(CXXFLAGS) -MM $^ > .depend;

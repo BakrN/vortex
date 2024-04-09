@@ -20,10 +20,12 @@ int main() {
 
     // //asm volatile(".insn r4 0x7B, 16, 0, 0, 0, 1, 4"); func2,func3
 
-    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
-    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
-    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
-    asm volatile (".insn r4 %0, 1, 0, f16, f1, f2,f3" :: "i"(TC_EXT) ) ; // no writeback
+    // WRITE BACK TESTS
+
+    asm volatile (".insn r4 %0, 0, 1, f16, f1, f2,f3" :: "i"(TC_EXT))  ;  // writeback
+    asm volatile (".insn r4 %0, 0, 1, f16, f1, f2,f3" :: "i"(TC_EXT))  ;  // writeback
+    asm volatile (".insn r4 %0, 0, 1, f16, f1, f2,f3" :: "i"(TC_EXT))  ;  // writeback
+    asm volatile (".insn r4 %0, 0, 1, f16, f1, f2,f3" :: "i"(TC_EXT))  ;  // writeback
 
     return 0 ;
 }

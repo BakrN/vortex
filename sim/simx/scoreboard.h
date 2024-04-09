@@ -107,9 +107,37 @@ public:
             break;
         }
         uint32_t tag = (state->rdest << 16) | (state->wid << 4) | (int)state->rdest_type;
-        assert(owners_.count(tag) == 0);
+        assert((owners_.count(tag) == 0 && state->exe_type != ExeType::TC) || state->exe_type == ExeType::TC); // unless It's a multi step loading process of TC. In that case, dest reg might be the same or it might be different.
         owners_[tag] = state->uuid;
     }
+
+    void reserveBlock(pipeline_trace_t* state, uint32_t block_size) {
+        assert (state->wb);
+        switch (state->rdest_type) {
+        case RegType::Integer:
+            {
+            for (uint32_t i = 0; i < block_size; i++)
+                in_use_iregs_.at(state->wid).set((state->rdest + i) %32);
+            break;
+            }
+        case RegType::Float:
+            {
+            for (uint32_t i = 0; i < block_size; i++)
+                in_use_fregs_.at(state->wid).set((state->rdest + i) %32);
+            break;
+            }
+        case RegType::Vector:
+            {
+            for (uint32_t i = 0; i < block_size; i++)
+                in_use_vregs_.at(state->wid).set((state->rdest + i) %32);
+            break;
+            }
+        default:
+            break;
+        }
+    }
+
+
 
     void release(pipeline_trace_t* state) {
         assert(state->wb);

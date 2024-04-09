@@ -44,7 +44,7 @@ static void parse_args(int argc, char **argv) {
     case 'k':
       kernel_file = optarg;
       break;
-    case 'h': 
+    case 'h':
     case '?': {
       show_usage();
       exit(0);
@@ -70,12 +70,12 @@ uint64_t shuffle(int i, uint64_t value) {
 
 int run_memcopy_test(uint32_t dev_addr, uint64_t value, int num_blocks) {
   int errors = 0;
-  
+
   auto time_start = std::chrono::high_resolution_clock::now();
 
   int num_blocks_8 = (64 * num_blocks) / 8;
 
-  // update source buffer  
+  // update source buffer
   for (int i = 0; i < num_blocks_8; ++i) {
     ((uint64_t*)staging_buf.data())[i] = shuffle(i, value);
   }
@@ -87,7 +87,7 @@ int run_memcopy_test(uint32_t dev_addr, uint64_t value, int num_blocks) {
     }
     std::cout << std::endl;
   }*/
-  
+
   // write source buffer to local memory
   std::cout << "write source buffer to local memory" << std::endl;
   auto t0 = std::chrono::high_resolution_clock::now();
@@ -115,8 +115,8 @@ int run_memcopy_test(uint32_t dev_addr, uint64_t value, int num_blocks) {
                 << ": actual 0x" << curr << ", expected 0x" << ref << std::endl;
       ++errors;
     }
-  } 
-  
+  }
+
   if (errors != 0) {
     std::cout << "Found " << std::dec << errors << " errors!" << std::endl;
     std::cout << "FAILED!" << std::endl;
@@ -126,23 +126,23 @@ int run_memcopy_test(uint32_t dev_addr, uint64_t value, int num_blocks) {
   auto time_end = std::chrono::high_resolution_clock::now();
 
   double elapsed;
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
   printf("upload time: %lg ms\n", elapsed);
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
   printf("download time: %lg ms\n", elapsed);
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
   printf("Total elapsed time: %lg ms\n", elapsed);
 
   return 0;
 }
 
-int run_kernel_test(const kernel_arg_t& kernel_arg, 
-                    uint32_t buf_size, 
+int run_kernel_test(const kernel_arg_t& kernel_arg,
+                    uint32_t buf_size,
                     uint32_t num_points) {
-  int errors = 0; 
+  int errors = 0;
 
   auto time_start = std::chrono::high_resolution_clock::now();
-  
+
   // update source buffer
   {
     std::cout << "upload source buffer" << std::endl;
@@ -150,7 +150,7 @@ int run_kernel_test(const kernel_arg_t& kernel_arg,
     for (uint32_t i = 0; i < num_points; ++i) {
       buf_ptr[i] = i;
     }
-  }  
+  }
   auto t0 = std::chrono::high_resolution_clock::now();
   RT_CHECK(vx_copy_to_dev(device, kernel_arg.src_addr, staging_buf.data(), buf_size));
   auto t1 = std::chrono::high_resolution_clock::now();
@@ -178,7 +178,7 @@ int run_kernel_test(const kernel_arg_t& kernel_arg,
   RT_CHECK(vx_copy_from_dev(device, staging_buf.data(), kernel_arg.dst_addr, buf_size));
   auto t5 = std::chrono::high_resolution_clock::now();
 
-  
+
   // verify result
   std::cout << "verify result" << std::endl;
   for (uint32_t i = 0; i < num_points; ++i) {
@@ -189,8 +189,8 @@ int run_kernel_test(const kernel_arg_t& kernel_arg,
                 << std::hex << ": actual 0x" << curr << ", expected 0x" << ref << std::endl;
       ++errors;
     }
-  } 
-  
+  }
+
   if (errors != 0) {
     std::cout << "Found " << std::dec << errors << " errors!" << std::endl;
     std::cout << "FAILED!" << std::endl;
@@ -200,13 +200,13 @@ int run_kernel_test(const kernel_arg_t& kernel_arg,
   auto time_end = std::chrono::high_resolution_clock::now();
 
   double elapsed;
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
   printf("upload time: %lg ms\n", elapsed);
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count();
   printf("execute time: %lg ms\n", elapsed);
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t5 - t4).count();
   printf("download time: %lg ms\n", elapsed);
-  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();  
+  elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
   printf("Total elapsed time: %lg ms\n", elapsed);
 
   return 0;
@@ -244,12 +244,12 @@ int main(int argc, char *argv[]) {
   std::cout << "dev_src=0x" << std::hex << kernel_arg.src_addr << std::endl;
   std::cout << "dev_dst=0x" << std::hex << kernel_arg.dst_addr << std::endl;
 
-  // allocate staging buffer  
+  // allocate staging buffer
   std::cout << "allocate staging buffer" << std::endl;
   uint32_t alloc_size = std::max<uint32_t>(buf_size, sizeof(kernel_arg_t));
   staging_buf.resize(alloc_size);
 
-  // run tests  
+  // run tests
   if (0 == test || -1 == test) {
     std::cout << "run memcopy test" << std::endl;
     RT_CHECK(run_memcopy_test(kernel_arg.src_addr, 0x0badf00d40ff40ff, num_blocks));
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
 
   if (1 == test || -1 == test) {
     // upload program
-    std::cout << "upload program" << std::endl;  
+    std::cout << "upload program" << std::endl;
     RT_CHECK(vx_upload_kernel_file(device, kernel_file));
 
     // upload kernel argument
@@ -273,10 +273,10 @@ int main(int argc, char *argv[]) {
   }
 
   // cleanup
-  std::cout << "cleanup" << std::endl;  
+  std::cout << "cleanup" << std::endl;
   cleanup();
 
-  std::cout << "Test PASSED" << std::endl;  
-  
+  std::cout << "Test PASSED" << std::endl;
+
   return 0;
 }
