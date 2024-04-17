@@ -20,26 +20,48 @@ struct float16 {
     mantissa = value & 0x3FF;
   }
   float to_float32() const {
-    float sign_float = sign ? -1.0f : 1.0f;  // Set sign as float
+      uint32_t sign = this->sign;
+      uint32_t exponent = this->exponent;
+      uint32_t fraction = this->mantissa;
+      uint32_t float32_value;
+      if (exponent == 0)
+      {
+          if (fraction == 0)
+          {
+              // zero
+              float32_value = (sign << 31);
+          }
+          else
+          {
+              // can be represented as ordinary value in float32
+              // 2 ** -14 * 0.0101
+              // => 2 ** -16 * 1.0100
+              // int int_exponent = -14;
+              exponent = 127 - 14;
+              while ((fraction & (1 << 10)) == 0)
+              {
+                  //int_exponent--;
+                  exponent--;
+                  fraction <<= 1;
+              }
+              fraction &= 0x3FF;
+              // int_exponent += 127;
+              float32_value = (sign << 31) | (exponent << 23) | (fraction << 13);
+          }
+      }
+      else if (exponent == 0x1F)
+      {
+          /* Inf or NaN */
+          float32_value = (sign << 31) | (0xFF << 23) | (fraction << 13);
+      }
+      else
+      {
+          /* ordinary number */
+          float32_value = (sign << 31) | ((exponent + (127-15)) << 23) | (fraction << 13);
+      }
 
-    // Combine exponent with bias (127 for float32)
-    int adjusted_exponent = exponent + 127;
+      return *((float*)&float32_value);
 
-    // Handle special cases (optional)
-    if (adjusted_exponent == 31) {  // Check for infinity or NaN
-      return (mantissa == 0) ? (sign_float * std::numeric_limits<float>::infinity()) : std::numeric_limits<float>::quiet_NaN();
-    } else if (adjusted_exponent == 0) {  // Check for denormals (underflow)
-      // Handle denormal case (e.g., set to 0.0f)
-      return 0.0f;
-    }
-
-    // Calculate base of the exponent (2 raised to the power of adjusted_exponent)
-    float base = std::pow(2.0f, adjusted_exponent - 127);
-
-    // Combine sign, base, and mantissa with hidden bit (implicit 1.0)
-    float mantissa_float = (1.0f + (float(mantissa) / 1024.0f)) * base;
-
-    return sign_float * mantissa_float;
   }
 };
 
@@ -230,11 +252,11 @@ void TensorCore::handleInput(){
             uint32_t a_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc1];
             uint32_t b_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc2];
 
-            A.first = (a_val & 0xFFFF0000) >> 16;
-            A.second = a_val & 0xFFFF ;
+            A.second= (a_val & 0xFFFF0000) >> 16;
+            A.first = a_val & 0xFFFF ;
 
-            B.first = (b_val & 0xFFFF0000) >> 16;
-            B.second = b_val & 0xFFFF ;
+            B.second = (b_val & 0xFFFF0000) >> 16;
+            B.first = b_val & 0xFFFF ;
 
             if (pe_grp.mata(wid).isBackFull()  || pe_grp.mata(wid).isEmpty()){ // and can I add it
                 MATMetadata meta;
