@@ -183,7 +183,7 @@ system = GEMMArgs()
 system.otile_row = tc.num_pes
 system.otile_col = tc.num_pes
 system.n = int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
-system.m = int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
+system.m = int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col)) #total over pe groups
 system.k = tc.operand_count # TileSizeRow
 print("TC")
 print (tc)

@@ -3,18 +3,18 @@
 #include "mat_helper.hpp"
 #include <cstdint>
 
-#define TC_EXT 0x7B
+#define TC_EXT 0x7b
 
-enum class Acc_t : uint8_t {
+enum class Acc_t : int{
     ACC_NONE = 0 , // Already loaded in accumulator value or no accumulation (0s)
-    ACC_REG ,
-    ACC_BUF,
+    ACC_REG = 1,
+    ACC_BUF = 2
 };
 
-enum class WriteBack_t : uint8_t {
+enum class WriteBack_t : int{
     WB_LOAD = 0,  // doesn't reserve anything in scoreboard
-    WB_REG ,
-    WB_BUF
+    WB_REG = 1 ,
+    WB_BUF = 2
 };
 
 
@@ -154,8 +154,7 @@ inline void mat_mma_wb_load_unroll(float** regA , float** regB , float** regC, f
 }
 
 inline void mat_mma_wb_unroll (float** regA , float** regB , float** regC, float** regD) {
-    mat_mma<Acc_t::ACC_REG, WriteBack_t::WB_LOAD>(*regA, *regB, *regC,*regD);
-
+    mat_mma<Acc_t::ACC_REG, WriteBack_t::WB_REG>(*regA, *regB, *regC,*regD);
     (*regA)++;
     (*regB)++;
     (*regC)++;

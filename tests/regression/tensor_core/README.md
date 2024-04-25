@@ -91,3 +91,6 @@ Thread mask. In simx, need to when commit have tmask on only commit once all ouu
 
 - If all PE Groups are operating synchronously then I will be able to have more data reuse (even A between PE Groups) How will driver strength affect timing behaviour (very low level)
 
+# Fixes
+- change output buffer to accomodate stepping mechanism (storage between threads is regular)
+

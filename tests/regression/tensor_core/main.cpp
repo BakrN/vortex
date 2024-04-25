@@ -4,7 +4,17 @@
 #include "helper.hpp"
 
 
+bool float_eq( float a , float b, float epsilon = 0.001) {
+    float diff;
+    if (a > b) {
+        diff = a-b;
+    } else if (b > a) {
+        diff = b-a;
+    }
 
+
+    return epsilon > diff;
+}
 
 
 vx_device_h device = nullptr;
@@ -28,15 +38,10 @@ int main(){
 
     read_matrices<TC_OP_SIZE, TC_RES_SIZE>(filename, MM_M, MM_N, MM_K, &A, &B, &C, &D_expected);
     // Print operand matrices
-    float* A_ptr = A;
-    float* B_ptr = B;
-    float* C_ptr = C;
-    float* D_ptr = D_expected;
-    // 4 4 2
     std::cout << "MAINCPP: PRINTING ROW MAJOR A" << std::endl;
     for (int i = 0 ; i < MM_M; i++) {
         for (int k = 0 ; k < MM_K; k+=2 ) {
-            uint32_t* val = (uint32_t*)(&(A[i]));
+            uint32_t* val = (uint32_t*)(&(A[i * MM_K*(TC_RES_SIZE/TC_OP_SIZE /2) +k]));
             uint16_t _second = (uint16_t)(*val >> 16);
             uint16_t _first = (uint16_t)(*val & 0xFFFF);
             float16 first(_first) ;
@@ -50,7 +55,7 @@ int main(){
     std::cout << "MAINCPP: PRINTING COL MAJOR B" << std::endl;
     for (int i = 0 ; i < MM_N; i++) {
         for (int k = 0 ; k < MM_K; k+=2 ) {
-            uint32_t* val = (uint32_t*)(&(B[i]));
+            uint32_t* val = (uint32_t*)(&(B[i * MM_K*(TC_RES_SIZE/TC_OP_SIZE /2) +k]));
             uint16_t _second = (uint16_t)(*val >> 16);
             uint16_t _first = (uint16_t)(*val & 0xFFFF);
             float16 first(_first) ;
@@ -86,10 +91,10 @@ int main(){
     kernel_arg_t kernel_args;
 
 
-    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_LOCAL, &A_ADDR);
-    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_LOCAL, &B_ADDR);
-    vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_LOCAL, &C_ADDR);
-    vx_mem_alloc(device, D_bytes, VX_MEM_TYPE_LOCAL, &D_ADDR);
+    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_GLOBAL, &A_ADDR);
+    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_GLOBAL, &B_ADDR);
+    vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_GLOBAL, &C_ADDR);
+    vx_mem_alloc(device, D_bytes, VX_MEM_TYPE_GLOBAL, &D_ADDR);
     std::cout << std::hex << "A_ADDR: " << A_ADDR << "\n \
             B_ADDR: " << B_ADDR << "\n \
             C_ADDR: " << C_ADDR << "\n \
@@ -124,12 +129,29 @@ int main(){
     vx_copy_from_dev(device, D_result, D_ADDR, D_bytes);
 
     // Compare result
+    std::cout << "D RESULT" << std::endl;
     for (int i = 0 ; i < MM_M; i ++) {
         for (int j = 0 ; j < MM_N; j++) {
             std::cout << D_result[i * MM_M + j] << " " ;
         }
         std::cout << std::endl;
     }
+
+    std::cout << "D EXPECTED" << std::endl;
+    for (int i = 0 ; i < MM_M; i ++) {
+        for (int j = 0 ; j < MM_N; j++) {
+            std::cout << D_expected[i * MM_M + j] << " " ;
+        }
+        std::cout << std::endl;
+    }
+
+    //for (int i = 0 ; i < MM_M; i ++) {
+    //    for (int j = 0 ; j < MM_N; j++) {
+    //        if (!float_eq(D_result[i* MM_M + j], D_expected[i* MM_M + j])) {
+    //            std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_M + j] << " act: " << D_result[i* MM_M + j] << std::endl;
+    //        }
+    //    }
+    //}
 
 
     free(A);

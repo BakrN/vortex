@@ -26,6 +26,8 @@
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 
 int main() {
+
+   // print a , b , c and , d
    vx_tmc(-1) ;
    const int thread_id = vx_thread_id();
    const int warp_id = vx_warp_id();
@@ -33,7 +35,7 @@ int main() {
 
    // possible mat partitioning here...(block should be passed using VX_WSPAWN)
 
-   kernel_arg_t* kernel_arg = (struct kernel_arg_t*)KERNEL_ARG_DEV_MEM_ADDR;
+   kernel_arg_t* kernel_arg = (kernel_arg_t*)KERNEL_ARG_DEV_MEM_ADDR;
 
    float* const A_start = (float*const)(kernel_arg->A_addr);
    float* const B_start = (float*const)(kernel_arg->B_addr);
@@ -56,7 +58,8 @@ int main() {
 
    float regA[tc_k * PREC_RATIO];
    float regB[tc_k * PREC_RATIO];
-   float regC[tc_k] = {0};
+   float regC[OTILE_COL] = {0}; // this should be equal to tc_n
+   float regD[OTILE_COL] = {0};
    // Main GEMM (simple 1 warp impl)
    for (int i = 0 ; i < MAT_M; i+=tc_m) {
        A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
@@ -67,44 +70,53 @@ int main() {
            // load c (OPTIMIZATION)
            for (int k = 0 ; k < MAT_K; k+=tc_k){
                // load data into regs
-               tc_load<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PE_GROUPS
+               tc_load<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES
                    >(A_ptr, B_ptr, C_ptr, (float*)regA, (float*)regB, (float*)regC, thread_id, MAT_M, MAT_N, MAT_K);
 
-                #ifdef DEBUG
+               #ifdef DEBUG
 
-                    vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                    for (int idx = 0 ; idx < tc_k; idx +=TC_RES_SIZE/TC_OP_SIZE) {
-                        uint32_t* val = (uint32_t*)(&regA[idx]);
-                        uint16_t _first = (uint16_t)(*val >> 16);
-                        uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                        float16 first(_first) ;
-                        float16 second(_second);
-                        vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
-                        vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
+                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=2) {
+                       uint32_t* val = (uint32_t*)(&regA[idx]);
+                       uint16_t _first = (uint16_t)(*val >> 16);
+                       uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                       float16 first(_first) ;
+                       float16 second(_second);
+                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
+                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
 
-                        val = (uint32_t*)(&regB[idx]);
-                        _first = (uint16_t)(*val >> 16);
-                        _second = (uint16_t)(*val & 0xFFFF);
-                        first = float16(_first);
-                        second = float16(_second);
-                        vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
-                        vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
-                    }
-                    for (int idx = 0 ; idx < tc_k; idx++) {
-                        //print regC
-                        vx_printf("(%d) regC[%d] = %f\n", thread_id, idx, regC[idx]);
-                    }
+                       val = (uint32_t*)(&regB[idx]);
+                       _first = (uint16_t)(*val >> 16);
+                       _second = (uint16_t)(*val & 0xFFFF);
+                       first = float16(_first);
+                       second = float16(_second);
+                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
+                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   }
+                   for (int idx = 0 ; idx < OTILE_COL; idx++) {
+                       //print regC
+                       vx_printf("(%d) regC[%d] = %f\n", thread_id, idx, regC[idx]);
+                   }
 
-                #endif
-
-
-               tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE>((float*)regA, (float*)regB, (float*)regC, (float*) regC);
+               #endif
 
 
-                A_ptr+=tc_k; // assuming row major
-                B_ptr+=tc_k; // assumiming col_major
+               tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE>((float*)regA, (float*)regB, (float*)regC, (float*) regD);
+
+
+               //#ifdef DEBUG
+
+               //for (int idx = 0 ; idx < OTILE_COL; idx++) {
+               //    vx_printf("(%d) regD[%d] = %f\n", thread_id, idx, regD[idx]);
+               //}
+
+               //#endif
+
+               A_ptr+=tc_k * PREC_RATIO; // assuming row major
+               B_ptr+=tc_k * PREC_RATIO; // assumiming col_major
            }
-           tc_store<float,tc_m, tc_n>(i , j , MAT_N, /*d_layout,*/ (float*)regC, (float*)D_ptr); // I need to know TC_PE_GROUPS, MAT_N
+           // Storage strategy can change here
+           tc_store<float,1, tc_n>(thread_id , 0 , MAT_N, /*d_layout,*/ (float*)regD, (float*)D_ptr);
        }
    }
 
