@@ -747,10 +747,10 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
             // no accumulation source
         } else if (func2 ==1) {
             // accumulation source is register
-            std::cout << "reg file " ;
+            std::cout << "reg file "  << rs3;
             instr->addSrcReg(rs3, RegType::Float);
         } else {
-            std::cout << "acc buffer " ;
+            std::cout << "acc buffer " << rs3;
             instr->addSrcReg(rs3, RegType::TC);
         }
         std::cout << std::endl ;

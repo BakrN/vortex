@@ -47,10 +47,7 @@ enum Opcode {
   // Vector Extension
   VSET      = 0x57,
   // TC Extension
-
-  MMA     = 0x7b, //  (func2: 2 bits [c_source, d_dest]) (R4_type) (Tensor core with accumulation)
-                    //  (func3: 3 bits )  3b000: accumulation value, 3b001: no accumulation, TODO: (Other formats to reuse 3rd reg for 1 or 2 operands from A or B)
-
+  MMA     = 0x7b,
   // Custom Extensions
   EXT1      = 0x0b,
   EXT2      = 0x2b,

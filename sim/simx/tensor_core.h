@@ -81,23 +81,33 @@ class PEGroup {
 
         void popOperands(int wid) ;
 
-        void allocateRow(MATMetadata meta, int wid){
-            m_mat_a[wid].allocateRow(meta);
-            m_mat_b[wid].allocateRow(meta);
-            m_mat_c[wid].allocateRow(meta);
+        void allocateRow(int wid){
+            m_mat_a[wid].allocateRow();
+            m_mat_b[wid].allocateRow();
+            m_mat_c[wid].allocateRow();
+        }
+
+        MATMetadata& frontMeta(int wid) {
+            return m_wb_meta[wid].front();
+        }
+
+        void popMeta(int wid) {
+            m_wb_meta[wid].pop();
+        }
+
+        void addMeta(MATMetadata meta, int wid) {
+            m_wb_meta[wid].push(meta) ;
         }
 
         bool isReadyToFire(int wid) {
-            auto& meta = m_mat_b[wid].frontMeta(); // allocate meta data in b (stepping will change it)
-
-            // Print all conditions here:
-            return m_mat_a[wid].isTopFull() && m_mat_b[wid].isTopFull() && m_mat_c[wid].isTopFull() && // operands available
+            auto& meta = m_wb_meta[wid].front();
+            return m_mat_a[wid].isFrontFull() && m_mat_b[wid].isFrontFull() && m_mat_c[wid].isFrontFull() && // operands available
             (meta.wb ? !m_output_fifo[0].isFull() : true);
         }
 
         uint32_t step(int wid) {
             m_mat_b[wid].shiftRight();
-            m_mat_b[wid].frontMeta().rd++;
+
             return ++m_cur_step[wid];
         };
 
@@ -124,6 +134,7 @@ class PEGroup {
         AccBuffer<uint32_t> m_tile_accumulator;
 
         std::vector<FIFO<std::pair<MATMetadata, uint32_t>>> m_output_fifo; // 1 per PE (warp_id, reg, val)
+        std::vector<std::queue<MATMetadata>> m_wb_meta;
 
         size_t m_num_pes;
         size_t m_cur_step[MAX_NUM_WARPS] ;

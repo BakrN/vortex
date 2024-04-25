@@ -2,6 +2,7 @@
 #define TC_HELPER_H
 
 #include "pipeline.h"
+#include "types.h"
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
@@ -26,7 +27,7 @@ struct FIFO {
         void push(T data){
             assert(!isFull());
             m_data[m_head] = data;
-            m_head = (m_head + 1) % m_size;
+            m_head = (m_head + 1) % (m_size+1);
             if( m_reserved){
                 m_reserved-- ;
             }
@@ -35,7 +36,7 @@ struct FIFO {
         T pop(){
             assert(!isEmpty());
             T data = m_data[m_tail];
-            m_tail= (m_tail+ 1) % m_size;
+            m_tail= (m_tail+ 1) % (m_size+1);
             return data;
         }
 
@@ -48,7 +49,7 @@ struct FIFO {
         }
 
         bool isFull() {
-            return (m_head+m_reserved+1) % m_size == m_tail;
+            return ((m_head+m_reserved+1) % (m_size+1)) == m_tail && !(m_head == 0 && m_tail == 0) ;
         }
 
         bool isEmpty() {
@@ -68,10 +69,11 @@ struct FIFO {
 } ;
 
 struct MATMetadata {
-      bool wb ;
-      uint16_t  warp_id;
-      uint16_t rd;
-  };
+    bool wb ;
+    uint16_t warp_id;
+    uint16_t rd;
+    std::bitset<MAX_NUM_THREADS> tmask;
+};
 
 
 
@@ -172,17 +174,17 @@ public:
   bool  isBackFull() {
       if (m_data.empty())
         return false;
-      return m_data.back().second.isFull(); }
+      return m_data.back().isFull(); }
 
     // Checks if the top row is full
-  bool isTopFull() const { return !m_data.empty() && m_data.front().second.isFull(); }
+  bool isFrontFull() const { return !m_data.empty() && m_data.front().isFull(); }
 
-  bool isEmpty() const { return m_data.empty(); }
+  bool isNonAllocated() const { return m_data.empty(); }
 
   bool isFull() { return m_rows >= m_max_depth && isBackFull(); }
 
-  void allocateRow(MATMetadata meta){
-      m_data.push({meta,ChunkVector<T>(m_width,num_regs)});
+  void allocateRow(){
+      m_data.emplace(ChunkVector<T>(m_width,num_regs));
       m_rows++;
   }
 
@@ -192,11 +194,10 @@ public:
       throw std::runtime_error("Structure is full");
     }
 
-    m_data.back().second.insert(value, reg);
+    m_data.back().insert(value, reg);
   }
 
-  std::vector<T>& frontRow(int chunk) { return m_data.front().second.getChunk(chunk); }
-  MATMetadata& frontMeta() { return m_data.front().first; }
+  std::vector<T>& frontRow(int chunk) { return m_data.front().getChunk(chunk); }
 
   void popRow() {
     if (m_data.empty()) {
@@ -210,22 +211,22 @@ public:
       return m_rows;
   }
 
-  bool isBackEmpty() { return m_data.empty() || m_data.back().second.empty(); }
+  bool isBackEmpty() { return m_data.empty() || m_data.back().empty(); }
 
   int width() { return m_width; }
 
 
   // For shift operations used in matrix B
   void shiftRight(){
-      m_data.front().second.shiftRight();
+      m_data.front().shiftRight();
   }
 
   int size(int chunk) {
-      return m_data.front().second.size(chunk);
+      return m_data.front().size(chunk);
   }
 
   int size() {
-      return m_data.front().second.size();
+      return m_data.front().size();
   }
 
 
@@ -234,7 +235,7 @@ private:
   size_t m_max_depth;
   size_t m_rows; // Number of rows with data
   size_t num_regs;
-  std::queue<std::pair<MATMetadata, ChunkVector<T>>> m_data;
+  std::queue<ChunkVector<T>> m_data;
 
 };
 

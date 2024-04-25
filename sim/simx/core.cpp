@@ -337,9 +337,7 @@ void Core::commit() {
     auto trace = committed_traces_.at(i);
     if (!trace)
       continue;
-    if (trace->exe_type == ExeType::TC){
-        std::cout << "HERE" << std::endl;
-    }
+
     committed_traces_.at(i) = nullptr;
 
     // advance to commit stage
@@ -714,7 +712,7 @@ bool Core::running() const {
   auto& exe_unit= (exe_units_[(int)ExeType::TC]);
   auto& tc = static_cast<TensorCore&>(*exe_unit);
   auto& dispatch = dispatchers_[(int)ExeType::TC];
-  //std::cout << "committed_instrs_ " << committed_instrs_ << " issued_instrs_ " << issued_instrs_ << " tc.isBusy() " << tc.isBusy() << " dispatch->processing() " << dispatch->processing() << std::endl;
+  // std::cout << "committed_instrs_ " << committed_instrs_ << " issued_instrs_ " << issued_instrs_ << " tc.isBusy() " << tc.isBusy() << " dispatch->processing() " << dispatch->processing() << std::endl;
   return (committed_instrs_ != issued_instrs_) || tc.isBusy() || dispatch->processing();
 }
 

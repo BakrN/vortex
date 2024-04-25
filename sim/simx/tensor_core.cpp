@@ -4,6 +4,7 @@
 #include "core.h"
 #include "tc_helper.h"
 #include "types.h"
+#include <cstring>
 #include <limits>
 #include <cmath>
 
@@ -95,44 +96,20 @@ float uint32_to_float32(uint32_t value) {
 }
 
 uint32_t float32_to_uint32(float value) {
-  // Handle special cases (optional)
-  if (std::isnan(value)) {
-    return 0x7FC00000;  // Quiet NaN representation
-  } else if (value == std::numeric_limits<float>::infinity()) {
-    return (value < 0.0f) ? 0xFF800000 : 0x7F800000;  // Positive/Negative Infinity representation
-  } else if (value == -0.0f) {
-    return 0x80000000;  // Negative zero representation
-  } else if (value == 0.0f) {
-    return 0x00000000;  // Positive zero representation
-  }
+    float v = value;
+    uint32_t* ptr = reinterpret_cast<uint32_t*>(&v);
+    uint32_t result = 0;
+    std::memcpy(&result, ptr, sizeof(uint32_t));
 
-  // Handle positive/negative sign
-  unsigned int sign = (value < 0.0f) ? 1 : 0;
-  value = std::abs(value);
+    return result;
 
-  // Extract integer part (biased exponent calculation)
-  int exponent = std::ilogbf(value) + 127;  // Efficiently get exponent using std::ilogbf
-
-  // Handle overflow/underflow (optional)
-  if (exponent > 128) {
-    exponent = 128;  // Clamp to maximum exponent (positive infinity)
-  } else if (exponent < -127) {
-    exponent = -127;  // Clamp to minimum exponent (zero)
-  }
-
-  // Extract mantissa (handle hidden bit)
-  float mantissa_float = value * std::ldexp(1.0f, -exponent);  // Efficiently scale down
-  mantissa_float -= 1.0f;  // Remove hidden bit
-
-  // Combine sign, exponent, and mantissa
-  uint32_t mantissa = static_cast<uint32_t>(mantissa_float * (1 << 23));  // Scale and convert to int
-  return (sign << 31) | ((exponent + 127) << 23) | mantissa;
 }
 
 PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t acc_buf_rows, size_t acc_buf_cols, size_t output_fifo_size, size_t num_acc_tiles)  :
     m_tile_accumulator(acc_buf_rows,acc_buf_cols, num_acc_tiles),
     m_num_pes(num_pes)
 {
+    m_wb_meta.resize(MAX_NUM_WARPS);
     for (int i = 0 ; i < MAX_NUM_WARPS; i++) {
         m_mat_a[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
         m_mat_b[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
@@ -189,7 +166,7 @@ bool TensorCore::isBusy() {
 
     // only need to check 1 pe group
     for (int i = 0 ; i < MAX_NUM_WARPS;i++)
-        busy |= !m_pe_groups[0].mata(i).isEmpty();
+        busy |= !m_pe_groups[0].mata(i).isNonAllocated();
     busy |= !m_pe_groups[0].getOutputFIFO(0).isEmpty();
 
     // Print all conditions here:
@@ -200,10 +177,13 @@ bool TensorCore::isBusy() {
 vortex::pipeline_trace_t* TensorCore::createInternalTrace(const MATMetadata& meta){
     uint32_t tag = (meta.rd << 16) | (meta.warp_id << 4) | (int)vortex::RegType::Float;
     vortex::pipeline_trace_t* trace = new vortex::pipeline_trace_t(tag , core_->arch());
-    trace->wb = true; // If i'm creating an internal trace then I'm sure I'm writing back
+    trace->eop = true;// If i'm creating an internal trace then I'm sure I'm writing back
+    trace->wb = true;
     trace->wid = meta.warp_id;
-    trace->rdest = meta.wb;
+    trace->rdest = meta.rd;
     trace->rdest_type = vortex::RegType::Float;
+    trace->exe_type = vortex::ExeType::TC;
+    trace->tmask = meta.tmask;
     return trace;
 }
 
@@ -224,7 +204,6 @@ void TensorCore::handleInput(){
         // Load Inputs (assumption parallel loading)
         auto wid = trace->wid;
         auto& warp = core_->warps_[trace->wid]; // can't handle multiple independent data streams for now (per row in matrix buffers can add warp tag) (also independent matrix tile buffers)
-        bool spaceav = true;
         for (size_t t = 0 ; t < MAX_NUM_THREADS; t++) {
             if (!trace->tmask.test(t)) {
                 continue;
@@ -232,7 +211,6 @@ void TensorCore::handleInput(){
             auto grp = t/m_config.num_pes % m_pe_groups.size();
             auto& pe_grp = m_pe_groups[grp];
             if (!pe_grp.spaceToAccept(trace->wid)) { // if ! space to accept exit
-                spaceav = false;
                 break;
             }
             if (!accepted_warp) {
@@ -241,6 +219,16 @@ void TensorCore::handleInput(){
                 accepted_warp = true;
                 if (trace->eop) {
                     core_->committed_instrs_++;
+                }
+
+                if (trace->rdest_type != vortex::RegType::None) { // Done only once
+                    MATMetadata meta;
+                    meta.wb = trace->wb ; // reg wb
+                    meta.warp_id = wid;
+                    meta.rd = trace->rdest;
+                    meta.tmask = trace->tmask;
+                    std::cout << "meta rd: " << meta.rd << std::endl;
+                    m_pe_groups[grp].addMeta(meta, wid);
                 }
             }
             std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
@@ -255,33 +243,48 @@ void TensorCore::handleInput(){
             A.second= (a_val & 0xFFFF0000) >> 16;
             A.first = a_val & 0xFFFF ;
 
+            float16 first(A.first) ;
+            float16 second(A.second);
+            std::cout << "Received A: " <<
+            first.to_float32() << " " ;
+            std::cout << second.to_float32();
+
+
             B.second = (b_val & 0xFFFF0000) >> 16;
             B.first = b_val & 0xFFFF ;
 
-            if (pe_grp.mata(wid).isBackFull()  || pe_grp.mata(wid).isEmpty()){ // and can I add it
+            first  = float16(B.first) ;
+            second = float16(B.second);
+            std::cout << "Received B: " <<
+            first.to_float32() << " " ;
+            std::cout << second.to_float32();
+
+
+
+            if (pe_grp.mata(wid).isBackFull()  || pe_grp.mata(wid).isNonAllocated()){ // and can I add it
                 MATMetadata meta;
                 meta.wb = trace->wb;
                 meta.warp_id = trace->wid;
                 meta.rd = trace->rdest;
-                std::cout << "A alloc Back full: " << pe_grp.mata(wid).isBackFull() << " Full: " << pe_grp.mata(wid).isFull() << " Empty: " << pe_grp.mata(wid).isEmpty() << std::endl;
-                pe_grp.allocateRow( meta,wid);
+                std::cout << "A alloc Back full: " << pe_grp.mata(wid).isBackFull() << " Full: " << pe_grp.mata(wid).isFull() << " Empty: " << pe_grp.mata(wid).isNonAllocated() << std::endl;
+                pe_grp.allocateRow( wid );
             }
 
+            auto pe = t % m_config.num_pes;
 
             if (trace->tc_type == vortex::TCOpType::ACC_REG) {
                 c = warp->freg_file_.at(t)[trace->rsrc3];
-
+                pe_grp.matc(wid).insert(c,pe);
             }
             else if(trace->tc_type == vortex::TCOpType::ACC_BUF) {
                 // fetch from mat tile accumulator
                 auto row = 0; // row is dependent on tid
                 auto col = trace->rsrc3;
                 c = m_pe_groups[grp].getAccMat(row, col);
-                pe_grp.matc(wid).insert(c);
+                pe_grp.matc(wid).insert(c, pe);
             }
 
 
-            auto pe = t % m_config.num_pes;
             pe_grp.mata(wid).insert(A.first, pe );
             pe_grp.mata(wid).insert(A.second,pe );
 
@@ -289,44 +292,13 @@ void TensorCore::handleInput(){
             pe_grp.matb(wid).insert(B.second, pe);
 
             // print t, pe , grp , warp_id
-            std::cout << "t: " << t << " pe: " << pe << " grp: " << grp << " warp_id: " << wid << " size(a): " <<  pe_grp.mata(wid).size(pe) << " depth " << pe_grp.mata(wid).depth() << std::endl;
-            assert(pe_grp.mata(wid).size(pe) == 2);
-            assert(pe_grp.matb(wid).size(pe) == 2);
+            std::cout << "t: " << t << " pe: " << pe << " grp: " << grp << " warp_id: " << wid
+            << " size(a): " <<  pe_grp.mata(wid).size(pe) <<  " size(b): " <<  pe_grp.matb(wid).size(pe)
+            << " size(c): " <<  pe_grp.matc(wid).size(pe) <<  " tf(a): " << pe_grp.mata(wid).isFrontFull()
+            <<  " tf(b): " << pe_grp.matb(wid).isFrontFull()  <<  " tf(c): " << pe_grp.matc(wid).isFrontFull()
+            << " depth " << pe_grp.mata(wid).depth() << std::endl;
         }
 
-        // queue up trace if it fills up row and wb
-        // Only valid with parallel loading
-        bool add_trace = spaceav;
-        for (size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
-            if (m_pe_groups[grp].mata(wid).isBackFull() && m_pe_groups[grp].matb(wid).isBackFull() && !m_pe_groups[grp].matc(wid).isBackFull()){
-                // if a and b are fully loaded and c isn't then fill rest of c with 0s (no acc) (assert c if empty otherwise there has been an error)
-                assert(m_pe_groups[grp].matc(wid).isBackEmpty());
-                while (!m_pe_groups[grp].matc(wid).isBackFull()) {
-                    m_pe_groups[grp].matc(wid).insert(0);
-                }
-            }
-
-            if (m_pe_groups[grp].mata(wid).isBackFull() && m_pe_groups[grp].matb(wid).isBackFull() && m_pe_groups[grp].matc(wid).isBackFull()) { // backs full and all are on the same row
-                add_trace &= true;
-                // fully loaded
-            } else {
-                add_trace = false;
-            }
-
-            if (grp >0) { // Add trace if entire row is fully loaded across pe groups
-                add_trace &= (m_pe_groups[grp].mata(wid).depth() == m_pe_groups[grp-1].mata(wid).depth()) ;
-            }
-        }
-
-        if (add_trace) {
-            // set correct meta data according to trace
-            for (size_t grp = 0 ; grp  < m_pe_groups.size(); grp++) {
-                auto& meta = m_pe_groups[grp].mata(wid).frontMeta();
-                meta.wb = trace->wb;    // determines
-                meta.rd = trace->rdest;
-            }
-            std::cout << "Fully loaded and registered trace" << std::endl;
-        }
         delete trace;
         // accept
         }
@@ -337,17 +309,17 @@ void TensorCore::compute(){
     for(int wid = 0 ; wid < MAX_NUM_WARPS;wid++) { // priority based
         for(size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
             // pop already processed top row
-            if (m_pe_groups[grp].matb(wid).isTopFull() && m_pe_groups[grp].getStep(wid) == m_config.num_pes){
+            if (m_pe_groups[grp].matb(wid).isFrontFull() && m_pe_groups[grp].getStep(wid) == m_config.num_pes){
                 m_pe_groups[grp].popOperands(wid);
                 std::cout << "Compute: popped operands GRP: " << grp << std::endl;
                 continue;
             }
-
             // otherwise process new loaded row
             else if (m_pe_groups[grp].isReadyToFire(wid) ){ // let's assume i always write back for now
                 //core_->issued_ins
                 std::cout << "Compute: ready to fire GRP: " << grp <<  std::endl;
-                MATMetadata meta = m_pe_groups[grp].matb(wid).frontMeta();
+                MATMetadata meta = m_pe_groups[grp].frontMeta(wid);
+                // TODO: Fix here
                 for (size_t pe = 0 ; pe < m_config.num_pes; pe++) {
                     // calculate all results
                     // step and pop
@@ -355,7 +327,6 @@ void TensorCore::compute(){
                     auto& B = m_pe_groups[grp].matb(wid).frontRow(pe);
                     auto& C = m_pe_groups[grp].matc(wid).frontRow(pe);
 
-                    // reinterpret cast A, B as float 16
                     float int_result = 0 ;
                     for(size_t i = 0 ; i < m_config.operand_count; i++) {
                         float16 _a(A[i]);
@@ -371,6 +342,7 @@ void TensorCore::compute(){
                     // queue
                     m_timing.push({m_cycle+m_config.execution_latency+1, {meta, result, {grp, pe}}});
                 }
+                m_pe_groups[grp].popMeta(wid); // Consume meta
 
                 if(meta.wb) { // reserve in queue
                     m_pe_groups[grp].reserveOutput();
@@ -389,7 +361,10 @@ void TensorCore::queueToOutput(){
             auto& [grp, pe] = pe_id;
 
             m_pe_groups[grp].insertOutput(pe, meta, result);
-            std::cout << "Queue to output GRP " << grp << " pe: " << pe << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << result << std::endl;
+            float f_res = 0 ;
+            float* ptr = reinterpret_cast<float*>(&result);
+            std::memcpy(&f_res, ptr, sizeof(float));
+            std::cout << "Queue to output GRP " << grp << " pe: " << pe << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
             m_timing.pop();
         } else {
             break;
@@ -414,25 +389,36 @@ void TensorCore::drainOutQueue(){
 
     // send to output & retire trace
     if (commit) {
+        std::cout << "Commit " << std::endl;
+        bool write_back = true;
         for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
             for (size_t pe = 0 ; pe < m_config.num_pes; pe++) {
                 auto [_meta, val] = m_pe_groups[grp].popOutput(pe);
                 meta = _meta;
                 if (_meta.wb) {
+                    if (!write_back){
+                        std::cout << "ERROR : NOT SUPPOSED TO HAPPEN" << std::endl;
+                    }
                     auto& warp = core_->warps_[meta.warp_id];
-                    warp->freg_file_.at(pe)[meta.rd] = val;
+                    warp->freg_file_.at(pe + grp*m_config.num_pes)[meta.rd] = val; // TODO: Changed later for partial thread exec
+                    float f_res = 0 ;
+                    float* ptr = reinterpret_cast<float*>(&val);
+                    std::memcpy(&f_res, ptr, sizeof(float));
+                    std::cout << "Wrote back to RG" << grp << " t: " << pe + grp*m_config.num_pes << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
+
+                } else {
+                    write_back = false;
                 }
-                std::cout << "Writeback: warp_id: " << _meta.warp_id << " pe: " << pe << " reg: " << _meta.rd << " val: " << val << std::endl;
             }
         }
-        //vortex::pipeline_trace_t* trace = m_traces.front();
-        //m_traces.pop_front();
-        ////if (trace->rdest_type == vortex::RegType::Float) {
-        core_->issued_instrs_++;
-        m_stat_out_traces++;
-        auto* trace = createInternalTrace(meta);
-        Outputs.at(0).send(trace,1 );
-        //}
+
+        if (write_back){
+            core_->issued_instrs_++;
+            m_stat_out_traces++;
+            auto* trace = createInternalTrace(meta);
+            std::cout << "Writeback TRACE: " << *trace << std::endl;
+            Outputs.at(0).send(trace,1 );
+        }
     }
 }
 
