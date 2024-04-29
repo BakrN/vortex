@@ -114,6 +114,8 @@ class ChunkVector{
             }
         }
 
+
+
         bool isFull() const {
             for (auto& e: chunks){
                 if ((int)e.size() < chunk_width){
@@ -279,5 +281,88 @@ class AccBuffer { // Accumulator buffer
         uint32_t m_head_index;
 };
 
+
+class TCOutputFifo {  // per pe
+    public :
+        TCOutputFifo(int pe, int num_pes, int fifo_depth): pe(pe), shared_pes(num_pes), max_depth(fifo_depth){
+            num_elements=0;
+            m_idx = 0 ;
+        }
+        ~TCOutputFifo(){}
+
+        void insert(const std::pair<MATMetadata, uint32_t>& value)  {
+            if (m_data.empty() || m_data.back().size()==(size_t)shared_pes ){
+                m_data.emplace(std::vector<uint32_t>());
+                m_data.back().emplace_back(value.second) ;
+
+                m_meta.emplace(std::vector<MATMetadata>());
+                m_meta.back().emplace_back(value.first) ;
+
+                m_shifted.push(false) ;
+            } else {
+                m_data.back().emplace_back(value.second) ;
+                m_meta.back().emplace_back(value.first) ;
+                if (m_data.back().size()==(size_t)shared_pes){
+                    for (int i = 0 ; i < pe ;i++){
+                        shiftElementsRight();
+                    }
+                    m_shifted.back() = true;
+                }
+            }
+        }
+
+        void pop(){
+            num_elements-= 1;
+            m_idx +=1 ;
+            if (m_idx == shared_pes){
+                m_data.pop();
+                m_meta.pop();
+                m_shifted.pop();
+                m_idx =0 ;
+            }
+        }
+
+        std::pair<MATMetadata, uint32_t> front(){
+            return {m_meta.front()[m_idx], m_data.front()[m_idx]};
+        }
+
+        void reserve() {
+            num_elements++;
+        }
+
+        bool shifted(){
+            return !m_shifted.empty() && m_shifted.front();
+        }
+
+
+        bool canReserve(){
+            return num_elements < shared_pes * max_depth ;
+        }
+
+        bool empty(){
+            return m_data.empty() ;
+        }
+
+    private:
+        void shiftElementsRight(){
+            assert(m_data.back().size()==(size_t)shared_pes) ; // Before shifting make sure all chunks are full
+
+            std::vector<uint32_t>& v = m_data.back();
+            uint32_t tmp = v[shared_pes-1];
+            for(int i = shared_pes-1; i > 0; i--){
+                v[i] = v[i-1] ;
+            }
+            v[0] = tmp;
+        }
+
+        std::queue<std::vector<uint32_t>> m_data;
+        std::queue<std::vector<MATMetadata>> m_meta;// get correct meta data order (fix)
+        std::queue<bool> m_shifted ;
+        int m_idx;
+        int pe ;
+        int shared_pes;
+        int num_elements;
+        int max_depth;
+};
 
 #endif // TC_HELPER_H

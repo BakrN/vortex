@@ -65,10 +65,6 @@ class PEGroup {
 
         size_t getNumPEs() {return m_num_pes; };
 
-        bool spaceInOutput(size_t pe_id=0) {
-            return !m_output_fifo[pe_id].isFull();
-        }
-
 
         void setAccMat(size_t row, size_t col, uint32_t data);
         uint32_t getAccMat(size_t row, size_t col);
@@ -76,8 +72,6 @@ class PEGroup {
         void insertOutput(size_t pe_id, MATMetadata meta, uint32_t val);
 
         std::pair<MATMetadata, uint32_t> popOutput(size_t pe_id);
-        bool isOutputEmpty(size_t pe_id) { return m_output_fifo[pe_id].isEmpty(); }
-
 
         void popOperands(int wid) ;
 
@@ -102,7 +96,7 @@ class PEGroup {
         bool isReadyToFire(int wid) {
             auto& meta = m_wb_meta[wid].front();
             return m_mat_a[wid].isFrontFull() && m_mat_b[wid].isFrontFull() && m_mat_c[wid].isFrontFull() && // operands available
-            (meta.wb ? !m_output_fifo[0].isFull() : true);
+            (meta.wb ? m_output_fifo[0].canReserve() : true);
         }
 
         uint32_t step(int wid) {
@@ -123,7 +117,7 @@ class PEGroup {
         MATBuffer<uint16_t>& mata  (int wid) { return m_mat_a[wid]; }
         MATBuffer<uint16_t>& matb  (int wid) { return m_mat_b[wid]; }
         MATBuffer<uint32_t>& matc  (int wid) { return m_mat_c[wid]; }
-        FIFO<std::pair<MATMetadata, uint32_t>>& getOutputFIFO(size_t pe) { return m_output_fifo[pe]; }
+        TCOutputFifo& getOutputFIFO(size_t pe) { return m_output_fifo[pe]; }
 
 
     private:
@@ -133,7 +127,7 @@ class PEGroup {
         MATBuffer<uint32_t> m_mat_c[MAX_NUM_WARPS];
         AccBuffer<uint32_t> m_tile_accumulator;
 
-        std::vector<FIFO<std::pair<MATMetadata, uint32_t>>> m_output_fifo; // 1 per PE (warp_id, reg, val)
+        std::vector<TCOutputFifo> m_output_fifo; // 1 per PE (warp_id, reg, val)
         std::vector<std::queue<MATMetadata>> m_wb_meta;
 
         size_t m_num_pes;

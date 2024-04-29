@@ -117,15 +117,17 @@ PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth
         m_cur_step[i] = 0;
     }
     for (size_t i = 0; i < num_pes; i++) {
-        m_output_fifo.emplace_back(FIFO<std::pair<MATMetadata, uint32_t>>(output_fifo_size));
+        m_output_fifo.emplace_back(TCOutputFifo(i, num_pes, output_fifo_size));
     }
 }
 
 void PEGroup::insertOutput(size_t pe_id, MATMetadata meta, uint32_t val){
-    m_output_fifo[pe_id].push(std::make_pair(meta, val));
+    m_output_fifo[pe_id].insert(std::make_pair(meta, val));
 }
 std::pair<MATMetadata, uint32_t> PEGroup::popOutput(size_t pe_id){
-    return m_output_fifo[pe_id].pop();
+    auto res = m_output_fifo[pe_id].front();
+    m_output_fifo[pe_id].pop() ;
+    return res;
 }
 void PEGroup::popOperands(int wid) {
     m_mat_a[wid].popRow();
@@ -167,7 +169,7 @@ bool TensorCore::isBusy() {
     // only need to check 1 pe group
     for (int i = 0 ; i < MAX_NUM_WARPS;i++)
         busy |= !m_pe_groups[0].mata(i).isNonAllocated();
-    busy |= !m_pe_groups[0].getOutputFIFO(0).isEmpty();
+    busy |= !m_pe_groups[0].getOutputFIFO(0).empty();
 
     // Print all conditions here:
 
@@ -381,7 +383,7 @@ void TensorCore::drainOutQueue(){
     MATMetadata meta;
     for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
         for (size_t pe = 0 ; pe < m_config.num_pes; pe++) {
-            if(m_pe_groups[grp].getOutputFIFO(pe).isEmpty()) { // if not empty and writing back to reg file
+            if(m_pe_groups[grp].getOutputFIFO(pe).empty() || !m_pe_groups[grp].getOutputFIFO(pe).shifted() ) { // if not empty and writing back to reg file
                 commit = false;
             }
         }
