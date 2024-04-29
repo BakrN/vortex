@@ -8,32 +8,32 @@
 	.type	main,@function
 main:                                   # @main
 # %bb.0:
-	addi	sp, sp, -208
-	sw	ra, 204(sp)                     # 4-byte Folded Spill
-	sw	s0, 200(sp)                     # 4-byte Folded Spill
-	sw	s1, 196(sp)                     # 4-byte Folded Spill
-	sw	s2, 192(sp)                     # 4-byte Folded Spill
-	sw	s3, 188(sp)                     # 4-byte Folded Spill
-	sw	s4, 184(sp)                     # 4-byte Folded Spill
-	sw	s5, 180(sp)                     # 4-byte Folded Spill
-	sw	s6, 176(sp)                     # 4-byte Folded Spill
-	sw	s7, 172(sp)                     # 4-byte Folded Spill
-	sw	s8, 168(sp)                     # 4-byte Folded Spill
-	sw	s9, 164(sp)                     # 4-byte Folded Spill
-	sw	s10, 160(sp)                    # 4-byte Folded Spill
-	sw	s11, 156(sp)                    # 4-byte Folded Spill
-	fsw	fs0, 152(sp)                    # 4-byte Folded Spill
-	fsw	fs1, 148(sp)                    # 4-byte Folded Spill
-	fsw	fs2, 144(sp)                    # 4-byte Folded Spill
-	fsw	fs3, 140(sp)                    # 4-byte Folded Spill
-	fsw	fs4, 136(sp)                    # 4-byte Folded Spill
-	fsw	fs5, 132(sp)                    # 4-byte Folded Spill
-	fsw	fs6, 128(sp)                    # 4-byte Folded Spill
-	fsw	fs7, 124(sp)                    # 4-byte Folded Spill
-	fsw	fs8, 120(sp)                    # 4-byte Folded Spill
-	fsw	fs9, 116(sp)                    # 4-byte Folded Spill
-	fsw	fs10, 112(sp)                   # 4-byte Folded Spill
-	fsw	fs11, 108(sp)                   # 4-byte Folded Spill
+	addi	sp, sp, -192
+	sw	ra, 188(sp)                     # 4-byte Folded Spill
+	sw	s0, 184(sp)                     # 4-byte Folded Spill
+	sw	s1, 180(sp)                     # 4-byte Folded Spill
+	sw	s2, 176(sp)                     # 4-byte Folded Spill
+	sw	s3, 172(sp)                     # 4-byte Folded Spill
+	sw	s4, 168(sp)                     # 4-byte Folded Spill
+	sw	s5, 164(sp)                     # 4-byte Folded Spill
+	sw	s6, 160(sp)                     # 4-byte Folded Spill
+	sw	s7, 156(sp)                     # 4-byte Folded Spill
+	sw	s8, 152(sp)                     # 4-byte Folded Spill
+	sw	s9, 148(sp)                     # 4-byte Folded Spill
+	sw	s10, 144(sp)                    # 4-byte Folded Spill
+	sw	s11, 140(sp)                    # 4-byte Folded Spill
+	fsw	fs0, 136(sp)                    # 4-byte Folded Spill
+	fsw	fs1, 132(sp)                    # 4-byte Folded Spill
+	fsw	fs2, 128(sp)                    # 4-byte Folded Spill
+	fsw	fs3, 124(sp)                    # 4-byte Folded Spill
+	fsw	fs4, 120(sp)                    # 4-byte Folded Spill
+	fsw	fs5, 116(sp)                    # 4-byte Folded Spill
+	fsw	fs6, 112(sp)                    # 4-byte Folded Spill
+	fsw	fs7, 108(sp)                    # 4-byte Folded Spill
+	fsw	fs8, 104(sp)                    # 4-byte Folded Spill
+	fsw	fs9, 100(sp)                    # 4-byte Folded Spill
+	fsw	fs10, 96(sp)                    # 4-byte Folded Spill
+	fsw	fs11, 92(sp)                    # 4-byte Folded Spill
 	li	a0, -1
 	#APP
 	.insn r 11, 0, 0, zero, a0, zero
@@ -49,13 +49,13 @@ main:                                   # @main
 	#NO_APP
 	lui	a0, 524287
 	lw	a6, 32(a0)
-	blez	a6, .LBB0_55
+	blez	a6, .LBB0_56
 # %bb.1:
-	sw	zero, 52(sp)                    # 4-byte Folded Spill
+	sw	zero, 40(sp)                    # 4-byte Folded Spill
 	lw	a1, 0(a0)
-	sw	a1, 12(sp)                      # 4-byte Folded Spill
+	sw	a1, 0(sp)                       # 4-byte Folded Spill
 	lw	a1, 4(a0)
-	sw	a1, 24(sp)                      # 4-byte Folded Spill
+	sw	a1, 8(sp)                       # 4-byte Folded Spill
 	lw	a1, 8(a0)
 	lw	a2, 12(a0)
 	lw	a7, 36(a0)
@@ -70,101 +70,99 @@ main:                                   # @main
 	andi	a0, a0, -4
 	sub	a0, s0, a0
 	add	a3, a3, a0
-	mul	a4, t0, a3
-	srli	a5, a4, 31
-	add	a4, a4, a5
-	srai	a4, a4, 1
+	mul	a4, a6, a3
+	mul	a3, t0, a3
+	srli	a5, a3, 31
+	add	a3, a3, a5
+	srai	a3, a3, 1
 	mul	a0, t0, a0
 	srli	a5, a0, 31
 	add	a0, a0, a5
 	srai	a0, a0, 1
-	sw	a6, 16(sp)                      # 4-byte Folded Spill
-	mul	a3, a6, a3
-	sw	a7, 32(sp)                      # 4-byte Folded Spill
+	sw	a7, 20(sp)                      # 4-byte Folded Spill
 	mul	a5, a7, s0
 	slli	a5, a5, 2
 	add	a2, a2, a5
-	sw	a2, 28(sp)                      # 4-byte Folded Spill
-	slli	a3, a3, 2
-	add	a1, a1, a3
-	sw	a1, 20(sp)                      # 4-byte Folded Spill
-	fmv.w.x	ft0, zero
+	sw	a2, 16(sp)                      # 4-byte Folded Spill
 	slli	a4, a4, 2
-	sw	a4, 44(sp)                      # 4-byte Folded Spill
+	add	a1, a1, a4
+	sw	a1, 12(sp)                      # 4-byte Folded Spill
+	slli	a3, a3, 2
+	sw	a3, 32(sp)                      # 4-byte Folded Spill
 	slli	a0, a0, 2
-	sw	a0, 40(sp)                      # 4-byte Folded Spill
+	sw	a0, 28(sp)                      # 4-byte Folded Spill
 .Lpcrel_hi0:
 	auipc	a0, %pcrel_hi(.L.str)
 	addi	a0, a0, %pcrel_lo(.Lpcrel_hi0)
-	sw	a0, 36(sp)                      # 4-byte Folded Spill
-	addi	s10, sp, 92
+	sw	a0, 24(sp)                      # 4-byte Folded Spill
+	addi	s10, sp, 76
 	li	s8, 30
 	lui	s9, 524288
 	lui	s7, 1046528
-	addi	s1, sp, 76
+	addi	s1, sp, 60
 	lui	s2, 522240
-	fmv.s	ft1, ft0
-	fmv.s	ft3, ft0
-	fmv.s	ft2, ft0
-	sw	t0, 48(sp)                      # 4-byte Folded Spill
-	j	.LBB0_3
-.LBB0_2:                                #   in Loop: Header=BB0_3 Depth=1
-	lw	a1, 52(sp)                      # 4-byte Folded Reload
-	addi	a1, a1, 4
-	lw	a0, 16(sp)                      # 4-byte Folded Reload
-	sw	a1, 52(sp)                      # 4-byte Folded Spill
-	bge	a1, a0, .LBB0_55
-.LBB0_3:                                # =>This Loop Header: Depth=1
-                                        #     Child Loop BB0_6 Depth 2
-                                        #       Child Loop BB0_9 Depth 3
-                                        #         Child Loop BB0_12 Depth 4
-                                        #           Child Loop BB0_18 Depth 5
-                                        #           Child Loop BB0_29 Depth 5
-                                        #           Child Loop BB0_40 Depth 5
-                                        #           Child Loop BB0_50 Depth 5
-	lw	a0, 32(sp)                      # 4-byte Folded Reload
-	blez	a0, .LBB0_2
-# %bb.4:                                #   in Loop: Header=BB0_3 Depth=1
-	sw	zero, 60(sp)                    # 4-byte Folded Spill
-	lw	a0, 52(sp)                      # 4-byte Folded Reload
+	sw	a6, 4(sp)                       # 4-byte Folded Spill
+	sw	t0, 36(sp)                      # 4-byte Folded Spill
+	j	.LBB0_4
+.LBB0_2:                                #   in Loop: Header=BB0_4 Depth=1
+	lw	a6, 4(sp)                       # 4-byte Folded Reload
+.LBB0_3:                                #   in Loop: Header=BB0_4 Depth=1
+	lw	a0, 40(sp)                      # 4-byte Folded Reload
+	addi	a0, a0, 4
+	sw	a0, 40(sp)                      # 4-byte Folded Spill
+	bge	a0, a6, .LBB0_56
+.LBB0_4:                                # =>This Loop Header: Depth=1
+                                        #     Child Loop BB0_7 Depth 2
+                                        #       Child Loop BB0_10 Depth 3
+                                        #         Child Loop BB0_13 Depth 4
+                                        #           Child Loop BB0_19 Depth 5
+                                        #           Child Loop BB0_30 Depth 5
+                                        #           Child Loop BB0_41 Depth 5
+                                        #           Child Loop BB0_51 Depth 5
+	lw	a0, 20(sp)                      # 4-byte Folded Reload
+	blez	a0, .LBB0_3
+# %bb.5:                                #   in Loop: Header=BB0_4 Depth=1
+	li	a2, 0
+	lw	a0, 40(sp)                      # 4-byte Folded Reload
 	mul	a0, a0, t0
 	slli	a0, a0, 1
-	lw	a1, 12(sp)                      # 4-byte Folded Reload
+	lw	a1, 0(sp)                       # 4-byte Folded Reload
 	add	a4, a1, a0
-	j	.LBB0_6
-.LBB0_5:                                #   in Loop: Header=BB0_6 Depth=2
-	lw	a0, 28(sp)                      # 4-byte Folded Reload
-	fsw	ft0, 0(a0)
-	fsw	ft1, 4(a0)
-	fsw	ft2, 8(a0)
-	lw	a1, 60(sp)                      # 4-byte Folded Reload
-	addi	a1, a1, 4
-	fsw	ft3, 12(a0)
-	lw	a0, 32(sp)                      # 4-byte Folded Reload
-	sw	a1, 60(sp)                      # 4-byte Folded Spill
-	bge	a1, a0, .LBB0_2
-.LBB0_6:                                #   Parent Loop BB0_3 Depth=1
+	j	.LBB0_7
+.LBB0_6:                                #   in Loop: Header=BB0_7 Depth=2
+	lw	a0, 16(sp)                      # 4-byte Folded Reload
+	fsw	fs3, 0(a0)
+	fsw	fs2, 4(a0)
+	fsw	fs1, 8(a0)
+	addi	a2, a2, 4
+	fsw	fs0, 12(a0)
+	lw	a0, 20(sp)                      # 4-byte Folded Reload
+	bge	a2, a0, .LBB0_2
+.LBB0_7:                                #   Parent Loop BB0_4 Depth=1
                                         # =>  This Loop Header: Depth=2
-                                        #       Child Loop BB0_9 Depth 3
-                                        #         Child Loop BB0_12 Depth 4
-                                        #           Child Loop BB0_18 Depth 5
-                                        #           Child Loop BB0_29 Depth 5
-                                        #           Child Loop BB0_40 Depth 5
-                                        #           Child Loop BB0_50 Depth 5
-	blez	t0, .LBB0_5
-# %bb.7:                                #   in Loop: Header=BB0_6 Depth=2
+                                        #       Child Loop BB0_10 Depth 3
+                                        #         Child Loop BB0_13 Depth 4
+                                        #           Child Loop BB0_19 Depth 5
+                                        #           Child Loop BB0_30 Depth 5
+                                        #           Child Loop BB0_41 Depth 5
+                                        #           Child Loop BB0_51 Depth 5
+	slli	a0, a2, 2
+	lw	a1, 12(sp)                      # 4-byte Folded Reload
+	add	a0, a1, a0
+	flw	fs3, 0(a0)
+	flw	fs2, 4(a0)
+	flw	fs1, 8(a0)
+	flw	fs0, 12(a0)
+	blez	t0, .LBB0_6
+# %bb.8:                                #   in Loop: Header=BB0_7 Depth=2
 	li	a3, 0
-	lw	a2, 60(sp)                      # 4-byte Folded Reload
 	mul	a0, a2, t0
 	slli	a0, a0, 1
-	lw	a1, 24(sp)                      # 4-byte Folded Reload
-	add	a5, a1, a0
-	slli	a0, a2, 2
-	lw	a1, 20(sp)                      # 4-byte Folded Reload
-	add	a0, a1, a0
-	sw	a0, 56(sp)                      # 4-byte Folded Spill
-	j	.LBB0_9
-.LBB0_8:                                #   in Loop: Header=BB0_9 Depth=3
+	lw	a1, 8(sp)                       # 4-byte Folded Reload
+	add	a1, a1, a0
+	sw	a2, 44(sp)                      # 4-byte Folded Spill
+	j	.LBB0_10
+.LBB0_9:                                #   in Loop: Header=BB0_10 Depth=3
 	fmv.s	fa0, fs3
 	call	__extendsfdf2@plt
 	mv	a4, a0
@@ -201,74 +199,69 @@ main:                                   # @main
 	mv	a1, s0
 	call	vx_printf
 	#APP
-	.insn r4 123, 1, 1, ft0, fs7, fs11, fs3
+	.insn r4 123, 1, 1, fs3, fs7, fs11, fs3
 	#NO_APP
 	#APP
-	.insn r4 123, 1, 1, ft1, fs6, fs10, fs2
+	.insn r4 123, 1, 1, fs2, fs6, fs10, fs2
 	#NO_APP
 	#APP
-	.insn r4 123, 1, 1, ft2, fs5, fs9, fs1
+	.insn r4 123, 1, 1, fs1, fs5, fs9, fs1
 	#NO_APP
 	#APP
-	.insn r4 123, 1, 1, ft3, fs4, fs8, fs0
+	.insn r4 123, 1, 1, fs0, fs4, fs8, fs0
 	#NO_APP
-	lw	a4, 72(sp)                      # 4-byte Folded Reload
+	lw	a4, 56(sp)                      # 4-byte Folded Reload
 	addi	a4, a4, 16
-	lw	a3, 68(sp)                      # 4-byte Folded Reload
+	lw	a3, 52(sp)                      # 4-byte Folded Reload
 	addi	a3, a3, 8
-	lw	a5, 64(sp)                      # 4-byte Folded Reload
-	addi	a5, a5, 16
-	lw	t0, 48(sp)                      # 4-byte Folded Reload
-	bge	a3, t0, .LBB0_5
-.LBB0_9:                                #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
+	lw	a1, 48(sp)                      # 4-byte Folded Reload
+	addi	a1, a1, 16
+	lw	t0, 36(sp)                      # 4-byte Folded Reload
+	lw	a2, 44(sp)                      # 4-byte Folded Reload
+	bge	a3, t0, .LBB0_6
+.LBB0_10:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
                                         # =>    This Loop Header: Depth=3
-                                        #         Child Loop BB0_12 Depth 4
-                                        #           Child Loop BB0_18 Depth 5
-                                        #           Child Loop BB0_29 Depth 5
-                                        #           Child Loop BB0_40 Depth 5
-                                        #           Child Loop BB0_50 Depth 5
-	lw	a0, 44(sp)                      # 4-byte Folded Reload
-	sw	a4, 72(sp)                      # 4-byte Folded Spill
+                                        #         Child Loop BB0_13 Depth 4
+                                        #           Child Loop BB0_19 Depth 5
+                                        #           Child Loop BB0_30 Depth 5
+                                        #           Child Loop BB0_41 Depth 5
+                                        #           Child Loop BB0_51 Depth 5
+	lw	a0, 32(sp)                      # 4-byte Folded Reload
+	sw	a4, 56(sp)                      # 4-byte Folded Spill
 	add	a0, a4, a0
 	flw	fs7, 0(a0)
-	fsw	fs7, 92(sp)
+	fsw	fs7, 76(sp)
 	flw	fs6, 4(a0)
-	fsw	fs6, 96(sp)
+	fsw	fs6, 80(sp)
 	flw	fs5, 8(a0)
-	fsw	fs5, 100(sp)
+	fsw	fs5, 84(sp)
 	flw	fs4, 12(a0)
-	fsw	fs4, 104(sp)
-	lw	a0, 40(sp)                      # 4-byte Folded Reload
-	sw	a5, 64(sp)                      # 4-byte Folded Spill
-	add	a0, a5, a0
+	fsw	fs4, 88(sp)
+	lw	a0, 28(sp)                      # 4-byte Folded Reload
+	sw	a1, 48(sp)                      # 4-byte Folded Spill
+	add	a0, a1, a0
 	flw	fs11, 0(a0)
-	fsw	fs11, 76(sp)
+	fsw	fs11, 60(sp)
 	flw	fs10, 4(a0)
-	fsw	fs10, 80(sp)
+	fsw	fs10, 64(sp)
 	flw	fs9, 8(a0)
-	fsw	fs9, 84(sp)
+	fsw	fs9, 68(sp)
 	flw	fs8, 12(a0)
-	fsw	fs8, 88(sp)
-	lw	a0, 56(sp)                      # 4-byte Folded Reload
-	flw	fs3, 0(a0)
-	flw	fs2, 4(a0)
-	flw	fs1, 8(a0)
-	flw	fs0, 12(a0)
-	lw	a0, 36(sp)                      # 4-byte Folded Reload
-	lw	a1, 52(sp)                      # 4-byte Folded Reload
-	lw	a2, 60(sp)                      # 4-byte Folded Reload
-	sw	a3, 68(sp)                      # 4-byte Folded Spill
+	fsw	fs8, 72(sp)
+	lw	a0, 24(sp)                      # 4-byte Folded Reload
+	lw	a1, 40(sp)                      # 4-byte Folded Reload
+	sw	a3, 52(sp)                      # 4-byte Folded Spill
 	call	vx_printf
 	li	s5, 0
 	li	s11, 1
-	j	.LBB0_12
-.LBB0_10:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_13
+.LBB0_11:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	slli	a3, a3, 13
 	or	a1, a3, s2
 	or	a2, a2, a1
-.LBB0_11:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_12:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a0
 	fmv.w.x	fa0, a2
 	call	__extendsfdf2@plt
@@ -283,15 +276,15 @@ main:                                   # @main
 	andi	a0, s11, 1
 	li	s5, 2
 	li	s11, 0
-	beqz	a0, .LBB0_8
-.LBB0_12:                               #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
-                                        #       Parent Loop BB0_9 Depth=3
+	beqz	a0, .LBB0_9
+.LBB0_13:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
+                                        #       Parent Loop BB0_10 Depth=3
                                         # =>      This Loop Header: Depth=4
-                                        #           Child Loop BB0_18 Depth 5
-                                        #           Child Loop BB0_29 Depth 5
-                                        #           Child Loop BB0_40 Depth 5
-                                        #           Child Loop BB0_50 Depth 5
+                                        #           Child Loop BB0_19 Depth 5
+                                        #           Child Loop BB0_30 Depth 5
+                                        #           Child Loop BB0_41 Depth 5
+                                        #           Child Loop BB0_51 Depth 5
 	slli	s3, s5, 2
 	add	a0, s10, s3
 	lw	s6, 0(a0)
@@ -301,37 +294,37 @@ main:                                   # @main
 	andi	a2, a3, 1023
 	slti	a0, a4, 31
 	vx_split	a0, a0
-	blt	s8, a4, .LBB0_15
-# %bb.13:                               #   in Loop: Header=BB0_12 Depth=4
+	blt	s8, a4, .LBB0_16
+# %bb.14:                               #   in Loop: Header=BB0_13 Depth=4
 	seqz	a1, a4
 	vx_split	a1, a1
-	beqz	a4, .LBB0_16
-# %bb.14:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a4, .LBB0_17
+# %bb.15:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a3, s6, s9
 	addi	a4, a4, 112
 	slli	a4, a4, 23
 	slli	a2, a2, 13
 	or	a2, a3, a2
 	or	a2, a4, a2
-	j	.LBB0_22
-.LBB0_15:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_23
+.LBB0_16:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a1, s6, s9
 	slli	a3, a3, 13
 	or	a2, a1, s2
 	or	a2, a3, a2
-	j	.LBB0_23
-.LBB0_16:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_24
+.LBB0_17:                               #   in Loop: Header=BB0_13 Depth=4
 	andi	a4, a3, 1023
 	seqz	a3, a4
 	vx_split	a3, a3
-	beqz	a4, .LBB0_20
-# %bb.17:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a4, .LBB0_21
+# %bb.18:                               #   in Loop: Header=BB0_13 Depth=4
 	lui	a4, 231424
 	csrr	a5, tmask
-.LBB0_18:                               #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
-                                        #       Parent Loop BB0_9 Depth=3
-                                        #         Parent Loop BB0_12 Depth=4
+.LBB0_19:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
+                                        #       Parent Loop BB0_10 Depth=3
+                                        #         Parent Loop BB0_13 Depth=4
                                         # =>        This Inner Loop Header: Depth=5
 	mv	a6, a2
 	slli	a2, a2, 1
@@ -339,21 +332,21 @@ main:                                   # @main
 	seqz	t0, a7
 	add	a4, a4, s7
 	vx_pred	t0, a5
-	beqz	a7, .LBB0_18
-# %bb.19:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a7, .LBB0_19
+# %bb.20:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a2, s6, s9
 	slli	a6, a6, 23
 	srli	a5, a6, 9
 	or	a2, a2, a4
 	or	a2, a5, a2
-	j	.LBB0_21
-.LBB0_20:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_22
+.LBB0_21:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a2, s6, s9
-.LBB0_21:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_22:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a3
-.LBB0_22:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_23:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a1
-.LBB0_23:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_24:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a0
 	slli	a0, s6, 17
 	srli	s4, a0, 27
@@ -372,37 +365,37 @@ main:                                   # @main
 	andi	a3, s6, 1023
 	slti	a0, s4, 31
 	vx_split	a0, a0
-	blt	s8, s4, .LBB0_26
-# %bb.24:                               #   in Loop: Header=BB0_12 Depth=4
+	blt	s8, s4, .LBB0_27
+# %bb.25:                               #   in Loop: Header=BB0_13 Depth=4
 	seqz	a1, s4
 	vx_split	a1, a1
-	beqz	s4, .LBB0_27
-# %bb.25:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	s4, .LBB0_28
+# %bb.26:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	addi	a4, s4, 112
 	slli	a4, a4, 23
 	slli	a3, a3, 13
 	or	a2, a2, a3
 	or	a2, a4, a2
-	j	.LBB0_33
-.LBB0_26:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_34
+.LBB0_27:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	slli	a3, a3, 13
 	or	a1, a3, s2
 	or	a2, a2, a1
-	j	.LBB0_34
-.LBB0_27:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_35
+.LBB0_28:                               #   in Loop: Header=BB0_13 Depth=4
 	andi	a5, s6, 1023
 	seqz	a4, a5
 	vx_split	a4, a4
-	beqz	a5, .LBB0_31
-# %bb.28:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a5, .LBB0_32
+# %bb.29:                               #   in Loop: Header=BB0_13 Depth=4
 	lui	a5, 231424
 	csrr	a6, tmask
-.LBB0_29:                               #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
-                                        #       Parent Loop BB0_9 Depth=3
-                                        #         Parent Loop BB0_12 Depth=4
+.LBB0_30:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
+                                        #       Parent Loop BB0_10 Depth=3
+                                        #         Parent Loop BB0_13 Depth=4
                                         # =>        This Inner Loop Header: Depth=5
 	mv	a7, a3
 	slli	a3, a3, 1
@@ -410,21 +403,21 @@ main:                                   # @main
 	seqz	t1, t0
 	add	a5, a5, s7
 	vx_pred	t1, a6
-	beqz	t0, .LBB0_29
-# %bb.30:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	t0, .LBB0_30
+# %bb.31:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	slli	a7, a7, 23
 	srli	a3, a7, 9
 	or	a2, a2, a5
 	or	a2, a3, a2
-	j	.LBB0_32
-.LBB0_31:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_33
+.LBB0_32:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
-.LBB0_32:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_33:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a4
-.LBB0_33:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_34:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a1
-.LBB0_34:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_35:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a0
 	ori	s6, s5, 1
 	fmv.w.x	fa0, a2
@@ -445,37 +438,37 @@ main:                                   # @main
 	andi	a2, a3, 1023
 	slti	a0, a4, 31
 	vx_split	a0, a0
-	blt	s8, a4, .LBB0_37
-# %bb.35:                               #   in Loop: Header=BB0_12 Depth=4
+	blt	s8, a4, .LBB0_38
+# %bb.36:                               #   in Loop: Header=BB0_13 Depth=4
 	seqz	a1, a4
 	vx_split	a1, a1
-	beqz	a4, .LBB0_38
-# %bb.36:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a4, .LBB0_39
+# %bb.37:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a3, s3, s9
 	addi	a4, a4, 112
 	slli	a4, a4, 23
 	slli	a2, a2, 13
 	or	a2, a3, a2
 	or	a2, a4, a2
-	j	.LBB0_44
-.LBB0_37:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_45
+.LBB0_38:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a1, s3, s9
 	slli	a3, a3, 13
 	or	a2, a1, s2
 	or	a2, a3, a2
-	j	.LBB0_45
-.LBB0_38:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_46
+.LBB0_39:                               #   in Loop: Header=BB0_13 Depth=4
 	andi	a4, a3, 1023
 	seqz	a3, a4
 	vx_split	a3, a3
-	beqz	a4, .LBB0_42
-# %bb.39:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a4, .LBB0_43
+# %bb.40:                               #   in Loop: Header=BB0_13 Depth=4
 	lui	a4, 231424
 	csrr	a5, tmask
-.LBB0_40:                               #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
-                                        #       Parent Loop BB0_9 Depth=3
-                                        #         Parent Loop BB0_12 Depth=4
+.LBB0_41:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
+                                        #       Parent Loop BB0_10 Depth=3
+                                        #         Parent Loop BB0_13 Depth=4
                                         # =>        This Inner Loop Header: Depth=5
 	mv	a6, a2
 	slli	a2, a2, 1
@@ -483,21 +476,21 @@ main:                                   # @main
 	seqz	t0, a7
 	add	a4, a4, s7
 	vx_pred	t0, a5
-	beqz	a7, .LBB0_40
-# %bb.41:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a7, .LBB0_41
+# %bb.42:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a2, s3, s9
 	slli	a6, a6, 23
 	srli	a5, a6, 9
 	or	a2, a2, a4
 	or	a2, a5, a2
-	j	.LBB0_43
-.LBB0_42:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_44
+.LBB0_43:                               #   in Loop: Header=BB0_13 Depth=4
 	and	a2, s3, s9
-.LBB0_43:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_44:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a3
-.LBB0_44:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_45:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a1
-.LBB0_45:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_46:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a0
 	slli	a0, s3, 17
 	srli	s4, a0, 27
@@ -516,31 +509,31 @@ main:                                   # @main
 	andi	a3, s3, 1023
 	slti	a0, s4, 31
 	vx_split	a0, a0
-	blt	s8, s4, .LBB0_10
-# %bb.46:                               #   in Loop: Header=BB0_12 Depth=4
+	blt	s8, s4, .LBB0_11
+# %bb.47:                               #   in Loop: Header=BB0_13 Depth=4
 	seqz	a1, s4
 	vx_split	a1, a1
-	beqz	s4, .LBB0_48
-# %bb.47:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	s4, .LBB0_49
+# %bb.48:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	addi	a4, s4, 112
 	slli	a4, a4, 23
 	slli	a3, a3, 13
 	or	a2, a2, a3
 	or	a2, a4, a2
-	j	.LBB0_54
-.LBB0_48:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_55
+.LBB0_49:                               #   in Loop: Header=BB0_13 Depth=4
 	andi	a5, s3, 1023
 	seqz	a4, a5
 	vx_split	a4, a4
-	beqz	a5, .LBB0_52
-# %bb.49:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	a5, .LBB0_53
+# %bb.50:                               #   in Loop: Header=BB0_13 Depth=4
 	lui	a5, 231424
 	csrr	a6, tmask
-.LBB0_50:                               #   Parent Loop BB0_3 Depth=1
-                                        #     Parent Loop BB0_6 Depth=2
-                                        #       Parent Loop BB0_9 Depth=3
-                                        #         Parent Loop BB0_12 Depth=4
+.LBB0_51:                               #   Parent Loop BB0_4 Depth=1
+                                        #     Parent Loop BB0_7 Depth=2
+                                        #       Parent Loop BB0_10 Depth=3
+                                        #         Parent Loop BB0_13 Depth=4
                                         # =>        This Inner Loop Header: Depth=5
 	mv	a7, a3
 	slli	a3, a3, 1
@@ -548,49 +541,49 @@ main:                                   # @main
 	seqz	t1, t0
 	add	a5, a5, s7
 	vx_pred	t1, a6
-	beqz	t0, .LBB0_50
-# %bb.51:                               #   in Loop: Header=BB0_12 Depth=4
+	beqz	t0, .LBB0_51
+# %bb.52:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
 	slli	a7, a7, 23
 	srli	a3, a7, 9
 	or	a2, a2, a5
 	or	a2, a3, a2
-	j	.LBB0_53
-.LBB0_52:                               #   in Loop: Header=BB0_12 Depth=4
+	j	.LBB0_54
+.LBB0_53:                               #   in Loop: Header=BB0_13 Depth=4
 	slli	a2, a2, 31
-.LBB0_53:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_54:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a4
-.LBB0_54:                               #   in Loop: Header=BB0_12 Depth=4
+.LBB0_55:                               #   in Loop: Header=BB0_13 Depth=4
 	vx_join	a1
-	j	.LBB0_11
-.LBB0_55:
+	j	.LBB0_12
+.LBB0_56:
 	li	a0, 0
-	lw	ra, 204(sp)                     # 4-byte Folded Reload
-	lw	s0, 200(sp)                     # 4-byte Folded Reload
-	lw	s1, 196(sp)                     # 4-byte Folded Reload
-	lw	s2, 192(sp)                     # 4-byte Folded Reload
-	lw	s3, 188(sp)                     # 4-byte Folded Reload
-	lw	s4, 184(sp)                     # 4-byte Folded Reload
-	lw	s5, 180(sp)                     # 4-byte Folded Reload
-	lw	s6, 176(sp)                     # 4-byte Folded Reload
-	lw	s7, 172(sp)                     # 4-byte Folded Reload
-	lw	s8, 168(sp)                     # 4-byte Folded Reload
-	lw	s9, 164(sp)                     # 4-byte Folded Reload
-	lw	s10, 160(sp)                    # 4-byte Folded Reload
-	lw	s11, 156(sp)                    # 4-byte Folded Reload
-	flw	fs0, 152(sp)                    # 4-byte Folded Reload
-	flw	fs1, 148(sp)                    # 4-byte Folded Reload
-	flw	fs2, 144(sp)                    # 4-byte Folded Reload
-	flw	fs3, 140(sp)                    # 4-byte Folded Reload
-	flw	fs4, 136(sp)                    # 4-byte Folded Reload
-	flw	fs5, 132(sp)                    # 4-byte Folded Reload
-	flw	fs6, 128(sp)                    # 4-byte Folded Reload
-	flw	fs7, 124(sp)                    # 4-byte Folded Reload
-	flw	fs8, 120(sp)                    # 4-byte Folded Reload
-	flw	fs9, 116(sp)                    # 4-byte Folded Reload
-	flw	fs10, 112(sp)                   # 4-byte Folded Reload
-	flw	fs11, 108(sp)                   # 4-byte Folded Reload
-	addi	sp, sp, 208
+	lw	ra, 188(sp)                     # 4-byte Folded Reload
+	lw	s0, 184(sp)                     # 4-byte Folded Reload
+	lw	s1, 180(sp)                     # 4-byte Folded Reload
+	lw	s2, 176(sp)                     # 4-byte Folded Reload
+	lw	s3, 172(sp)                     # 4-byte Folded Reload
+	lw	s4, 168(sp)                     # 4-byte Folded Reload
+	lw	s5, 164(sp)                     # 4-byte Folded Reload
+	lw	s6, 160(sp)                     # 4-byte Folded Reload
+	lw	s7, 156(sp)                     # 4-byte Folded Reload
+	lw	s8, 152(sp)                     # 4-byte Folded Reload
+	lw	s9, 148(sp)                     # 4-byte Folded Reload
+	lw	s10, 144(sp)                    # 4-byte Folded Reload
+	lw	s11, 140(sp)                    # 4-byte Folded Reload
+	flw	fs0, 136(sp)                    # 4-byte Folded Reload
+	flw	fs1, 132(sp)                    # 4-byte Folded Reload
+	flw	fs2, 128(sp)                    # 4-byte Folded Reload
+	flw	fs3, 124(sp)                    # 4-byte Folded Reload
+	flw	fs4, 120(sp)                    # 4-byte Folded Reload
+	flw	fs5, 116(sp)                    # 4-byte Folded Reload
+	flw	fs6, 112(sp)                    # 4-byte Folded Reload
+	flw	fs7, 108(sp)                    # 4-byte Folded Reload
+	flw	fs8, 104(sp)                    # 4-byte Folded Reload
+	flw	fs9, 100(sp)                    # 4-byte Folded Reload
+	flw	fs10, 96(sp)                    # 4-byte Folded Reload
+	flw	fs11, 92(sp)                    # 4-byte Folded Reload
+	addi	sp, sp, 192
 	ret
 .Lfunc_end0:
 	.size	main, .Lfunc_end0-main

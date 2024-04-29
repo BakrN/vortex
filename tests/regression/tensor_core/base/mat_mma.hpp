@@ -162,7 +162,16 @@ inline void mat_mma_wb_unroll (float** regA , float** regB , float** regC, float
 
 }
 
-template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2>
+inline void mat_mma_wb_unroll_overwrite (float** regA , float** regB , float** regC) {
+    mat_mma<Acc_t::ACC_REG, WriteBack_t::WB_REG>(*regA, *regB, *regC,*regC);
+    (*regA)++;
+    (*regB)++;
+    (*regC)++;
+
+}
+
+
+template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, bool overwrite =true>
 inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float* regD) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     static_assert(num_loads >= STEPS, "Steps cannot be larger than number of loads when using register file as accumulator. Because if steps is more that means my C register per PE is not entirely filled");
@@ -178,7 +187,11 @@ inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float
         }
         // Unroll the rest
         //unrolled_for_func<0, STEPS>(mat_mma<Acc_t::ACC_REG, WriteBack_t::WB_REG>, regA++, regB++, regC++,regD++);
-        unrolled_for_func<0, STEPS>(mat_mma_wb_unroll, &regA, &regB, &regC,&regD);
+        if constexpr (overwrite){
+            unrolled_for_func<0, STEPS>(mat_mma_wb_unroll_overwrite, &regA, &regB, &regC);
+        } else {
+            unrolled_for_func<0, STEPS>(mat_mma_wb_unroll, &regA, &regB, &regC,&regD);
+        }
     }
 }
 

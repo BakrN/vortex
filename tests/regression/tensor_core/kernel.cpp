@@ -25,6 +25,8 @@
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 
+
+
 int main() {
 
    // print a , b , c and , d
@@ -59,7 +61,6 @@ int main() {
    float regA[tc_k * PREC_RATIO];
    float regB[tc_k * PREC_RATIO];
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
-   float regD[OTILE_COL] = {0};
    // Main GEMM (simple 1 warp impl)
    for (int i = 0 ; i < MAT_M; i+=tc_m) {
        A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
@@ -68,10 +69,10 @@ int main() {
            B_ptr=B_start+ MAT_K*j*PREC_RATIO;  // COL MAJOR
            C_ptr=C_start +j; // ROW MAJOR
            // load c (OPTIMIZATION)
+           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            for (int k = 0 ; k < MAT_K; k+=tc_k){
-               // load data into regs
-               tc_load<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES
-                   >(A_ptr, B_ptr, C_ptr, (float*)regA, (float*)regB, (float*)regC, thread_id, MAT_M, MAT_N, MAT_K);
+               tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
+               tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
                #ifdef DEBUG
 
@@ -101,7 +102,7 @@ int main() {
                #endif
 
 
-               tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE>((float*)regA, (float*)regB, (float*)regC, (float*) regD);
+               tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,true>((float*)regA, (float*)regB, (float*)regC, (float*) regC);
 
 
                //#ifdef DEBUG
@@ -116,7 +117,7 @@ int main() {
                B_ptr+=tc_k * PREC_RATIO; // assumiming col_major
            }
            // Storage strategy can change here
-           tc_store<float,1, tc_n>(thread_id , 0 , MAT_N, /*d_layout,*/ (float*)regD, (float*)D_ptr);
+           tc_store<float,1, tc_n>(thread_id , 0 , MAT_N, /*d_layout,*/ (float*)regC, (float*)D_ptr);
        }
    }
 

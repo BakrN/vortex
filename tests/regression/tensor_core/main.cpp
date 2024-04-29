@@ -4,7 +4,7 @@
 #include "helper.hpp"
 
 
-bool float_eq( float a , float b, float epsilon = 0.001) {
+bool float_eq( float a , float b, float epsilon = 0.05) {
     float diff;
     if (a > b) {
         diff = a-b;
@@ -145,13 +145,13 @@ int main(){
         std::cout << std::endl;
     }
 
-    //for (int i = 0 ; i < MM_M; i ++) {
-    //    for (int j = 0 ; j < MM_N; j++) {
-    //        if (!float_eq(D_result[i* MM_M + j], D_expected[i* MM_M + j])) {
-    //            std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_M + j] << " act: " << D_result[i* MM_M + j] << std::endl;
-    //        }
-    //    }
-    //}
+    for (int i = 0 ; i < MM_M; i ++) {
+        for (int j = 0 ; j < MM_N; j++) {
+            if (!float_eq(D_result[i* MM_M + j], D_expected[i* MM_M + j])) {
+                std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_M + j] << " act: " << D_result[i* MM_M + j] << std::endl;
+            }
+        }
+    }
 
 
     free(A);

@@ -9,6 +9,8 @@ CXXFLAGS += $(CONFIGS)
 CXXFLAGS += -DDUMP_PERF_STATS
 CXXFLAGS += -DXLEN_$(XLEN)
 
+EXTFLAGS = ""
+
 LDFLAGS += -shared -pthread
 LDFLAGS += -L. -lsimx
 
@@ -17,7 +19,7 @@ SRCS = vortex.cpp ../common/utils.cpp
 # Debugigng
 ifdef DEBUG
 	CXXFLAGS += -g -O0
-else    
+else
 	CXXFLAGS += -O2 -DNDEBUG
 endif
 
@@ -26,7 +28,7 @@ PROJECT = libvortex.so
 all: $(PROJECT)
 
 $(PROJECT): $(SRCS)
-	DESTDIR=../../runtime/simx $(MAKE) -C $(SIMX_DIR) ../../runtime/simx/libsimx.so
+	DESTDIR=../../runtime/simx $(MAKE)  -C $(SIMX_DIR) ../../runtime/simx/libsimx.so EXTFLAGS+="$(EXTFLAGS)"
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 clean:
