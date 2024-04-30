@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,6 +32,7 @@
 #include <arch.h>
 #include <mem.h>
 #include <constants.h>
+#include <processor_impl.h>
 
 #ifndef NDEBUG
 #define DBGPRINT(format, ...) do { printf("[VXDRV] " format "", ##__VA_ARGS__); } while (0)
@@ -47,7 +48,7 @@ class vx_device;
 
 class vx_buffer {
 public:
-    vx_buffer(uint64_t size, vx_device* device) 
+    vx_buffer(uint64_t size, vx_device* device)
         : size_(size)
         , device_(device) {
         uint64_t aligned_asize = aligned_size(size, CACHE_BLOCK_SIZE);
@@ -84,9 +85,9 @@ private:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-class vx_device {    
+class vx_device {
 public:
-    vx_device() 
+    vx_device()
         : arch_(NUM_THREADS, NUM_WARPS, NUM_CORES, NUM_CLUSTERS)
         , ram_(RAM_PAGE_SIZE)
         , processor_(arch_)
@@ -109,7 +110,7 @@ public:
         if (future_.valid()) {
             future_.wait();
         }
-    }    
+    }
 
     int mem_alloc(uint64_t size, int type, uint64_t* dev_addr) {
         if (type == VX_MEM_TYPE_GLOBAL) {
@@ -150,13 +151,23 @@ public:
         if (dest_addr + asize > GLOBAL_MEM_SIZE)
             return -1;
 
-        ram_.write((const uint8_t*)src, dest_addr, size);
-        
+        // If it's to smem I will write it into the local shared memory (ONLY) This means that if other clusters want to access this data, I will have to write out of shared memory to global memory first and then read.
+        if (dest_addr >= SMEM_BASE_ADDR && dest_addr < (SMEM_BASE_ADDR + (1 << SMEM_LOG_SIZE))) {
+            // get clusters and loat into shared memory
+            for (auto& cluster : processor_.impl_->clusters_) {
+                for (auto& smem: cluster->sharedmems_) {
+                    smem->write(src, dest_addr, size);
+                }
+            }
+        } else {
+            ram_.write((const uint8_t*)src, dest_addr, size);
+        }
+
         /*DBGPRINT("upload %ld bytes to 0x%lx\n", size, dest_addr);
         for (uint64_t i = 0; i < size && i < 1024; i += 4) {
             DBGPRINT("  0x%lx <- 0x%x\n", dest_addr + i, *(uint32_t*)((uint8_t*)src + i));
         }*/
-        
+
         return 0;
     }
 
@@ -166,26 +177,26 @@ public:
             return -1;
 
         ram_.read((uint8_t*)dest, src_addr, size);
-        
+
         /*DBGPRINT("download %ld bytes from 0x%lx\n", size, src_addr);
         for (uint64_t i = 0; i < size && i < 1024; i += 4) {
             DBGPRINT("  0x%lx -> 0x%x\n", src_addr + i, *(uint32_t*)((uint8_t*)dest + i));
         }*/
-        
+
         return 0;
     }
 
-    int start() {  
+    int start() {
         // ensure prior run completed
         if (future_.valid()) {
             future_.wait();
         }
-        
+
         // start new run
         future_ = std::async(std::launch::async, [&]{
             processor_.run(false);
         });
-        
+
         return 0;
     }
 
@@ -197,7 +208,7 @@ public:
         for (;;) {
             // wait for 1 sec and check status
             auto status = future_.wait_for(wait_time);
-            if (status == std::future_status::ready 
+            if (status == std::future_status::ready
              || 0 == timeout_sec--)
                 break;
         }
@@ -207,7 +218,7 @@ public:
     int write_dcr(uint32_t addr, uint32_t value) {
         if (future_.valid()) {
             future_.wait(); // ensure prior run completed
-        }        
+        }
         processor_.write_dcr(addr, value);
         dcrs_.write(addr, value);
         return 0;
@@ -245,7 +256,7 @@ extern int vx_dev_open(vx_device_h* hdevice) {
 
 #ifdef DUMP_PERF_STATS
     perf_add_device(device);
-#endif  
+#endif
 
     *hdevice = device;
 
@@ -299,7 +310,7 @@ extern int vx_dev_caps(vx_device_h hdevice, uint32_t caps_id, uint64_t *value) {
     case VX_CAPS_KERNEL_BASE_ADDR:
         *value = (uint64_t(device->read_dcr(VX_DCR_BASE_STARTUP_ADDR1)) << 32)
                          | device->read_dcr(VX_DCR_BASE_STARTUP_ADDR0);
-        break;    
+        break;
     case VX_CAPS_ISA_FLAGS:
         *value = ((uint64_t(MISA_EXT))<<32) | ((log2floor(XLEN)-4) << 30) | MISA_STD;
         break;
@@ -313,7 +324,7 @@ extern int vx_dev_caps(vx_device_h hdevice, uint32_t caps_id, uint64_t *value) {
 }
 
 extern int vx_mem_alloc(vx_device_h hdevice, uint64_t size, int type, uint64_t* dev_addr) {
-    if (nullptr == hdevice 
+    if (nullptr == hdevice
      || nullptr == dev_addr
      || 0 == size)
         return -1;
@@ -358,15 +369,15 @@ extern int vx_copy_from_dev(vx_device_h hdevice, void* host_ptr, uint64_t dev_ad
 
     auto device = ((vx_device*)hdevice);
 
-    DBGPRINT("COPY_FROM_DEV: dev_addr=0x%lx, host_addr=0x%p, size=%ld\n", dev_addr, host_ptr, size); 
+    DBGPRINT("COPY_FROM_DEV: dev_addr=0x%lx, host_addr=0x%p, size=%ld\n", dev_addr, host_ptr, size);
 
     return device->download(host_ptr, dev_addr, size);
 }
 
 extern int vx_start(vx_device_h hdevice) {
     if (nullptr == hdevice)
-        return -1;    
-    
+        return -1;
+
     DBGPRINT("START\n");
 
     vx_device *device = ((vx_device*)hdevice);
@@ -392,6 +403,6 @@ extern int vx_dcr_write(vx_device_h hdevice, uint32_t addr, uint64_t value) {
         return -1;
 
     DBGPRINT("DCR_WRITE: addr=0x%x, value=0x%lx\n", addr, value);
-  
+
     return device->write_dcr(addr, value);
 }

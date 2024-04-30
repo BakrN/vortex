@@ -91,9 +91,9 @@ int main(){
     kernel_arg_t kernel_args;
 
 
-    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_GLOBAL, &A_ADDR);
-    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_GLOBAL, &B_ADDR);
-    vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_GLOBAL, &C_ADDR);
+    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_LOCAL, &A_ADDR);
+    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_LOCAL, &B_ADDR);
+    vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_LOCAL, &C_ADDR);
     vx_mem_alloc(device, D_bytes, VX_MEM_TYPE_GLOBAL, &D_ADDR);
     std::cout << std::hex << "A_ADDR: " << A_ADDR << "\n \
             B_ADDR: " << B_ADDR << "\n \

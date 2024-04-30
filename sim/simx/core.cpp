@@ -427,7 +427,7 @@ void Core::icache_read(void *data, uint64_t addr, uint32_t size) {
 }
 
 AddrType Core::get_addr_type(uint64_t addr) {
-  if (SM_ENABLED) {
+  if (1/*SM_ENABLED*/) {
     if (addr >= SMEM_BASE_ADDR && addr < (SMEM_BASE_ADDR + (1 << SMEM_LOG_SIZE))) {
         return AddrType::Shared;
     }
