@@ -2,6 +2,7 @@
 #define _STAT_ENGINE_H
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "statistic.h"
 #include "stat_output.h"
@@ -18,8 +19,8 @@ class StatEngine {
 
     private:
         std::string fname;  // file name
-        std::vector<std::pair<Statistic*, bool> > stats; // Statistic , resetOnOutput
-
+        std::vector<std::pair<std::unique_ptr<Statistic>, bool> > stats; // Statistic , resetOnOutput
+        StatOutput output;
 };
 
 }

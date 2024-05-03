@@ -7,8 +7,20 @@ StatEngine::StatEngine(const std::string& stat_file) {
 
 StatEngine::~StatEngine() {
     // delete all statistics
-    for (size_t i = 0; i < stats.size(); i++) {
-        delete stats[i].first;
-    }
+
 }
 
+Statistic* StatEngine::registerStatistic(std::string name, bool resetOnOutput) {
+    auto pair = std::make_pair(std::make_unique<Statistic>(name), resetOnOutput);
+    stats.emplace_back(pair);
+    return stats.back().first.get();
+}
+
+void StatEngine::outputStatistics(uint64_t timestamp) {
+    for (auto& stat : stats) {
+        //output.write(timestamp, stat.first->getName(), stat.first->getSum(), stat.first->getCount(), stat.first->getMax(), stat.first->getMin());
+        if (stat.second) {
+            stat.first->reset();
+        }
+    }
+}
