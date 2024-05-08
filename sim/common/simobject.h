@@ -349,6 +349,11 @@ public:
     cycles_ = 0;
   }
 
+  void schedule_recurring(const std::function<void()>& callback, uint64_t interval){
+      assert(interval != 0);
+      recurring_events_.emplace_back(std::make_pair(callback,  interval));
+  }
+
   void tick() {
     // evaluate events
     auto evt_it = events_.begin();
@@ -362,6 +367,13 @@ public:
         ++evt_it;
       }
     }
+
+    for (auto& e: recurring_events_) {
+        if (cycles_ % e.second == 0) {
+            e.first();
+        }
+    }
+
     // evaluate components
     for (auto& object : objects_) {
       object->do_tick();
@@ -396,6 +408,7 @@ private:
 
   std::list<SimObjectBase::Ptr> objects_;
   std::list<SimEventBase::Ptr> events_;
+  std::vector<std::pair<std::function<void()>, uint64_t>> recurring_events_;
   uint64_t cycles_;
 
   template <typename U> friend class SimPort;

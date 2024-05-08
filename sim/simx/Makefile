@@ -5,7 +5,7 @@ THIRD_PARTY_DIR = ../../third_party
 
 CXXFLAGS += -std=c++17 -Wall -Wextra -Wfatal-errors
 CXXFLAGS += -fPIC -Wno-maybe-uninitialized
-CXXFLAGS += -I. -I../common -I../../hw
+CXXFLAGS += -I. -I../common -I../../hw -I./util
 CXXFLAGS += -I$(THIRD_PARTY_DIR)/softfloat/source/include
 CXXFLAGS += -I$(THIRD_PARTY_DIR)
 CXXFLAGS += -DXLEN_$(XLEN)
@@ -21,6 +21,7 @@ LDFLAGS += -L$(THIRD_PARTY_DIR)/ramulator -lramulator
 
 SRCS = ../common/util.cpp ../common/mem.cpp ../common/rvfloats.cpp
 SRCS += processor.cpp cluster.cpp core.cpp warp.cpp decode.cpp execute.cpp exe_unit.cpp cache_sim.cpp mem_sim.cpp shared_mem.cpp dcrs.cpp tensor_core.cpp
+SRCS += stat_engine.cpp stat_output.cpp
 
 # Debugigng
 ifdef DEBUG

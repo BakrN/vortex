@@ -1,15 +1,17 @@
 #ifndef _STAT_OUTPUT_H
 #define _STAT_OUTPUT_H
+#include "statistic.h"
+#include <fstream>
 
-class StatOutput {
-};
-
-
-class CSVStatOutput : public StatOutput {
-    public:
-
-    private:
-
-};
-
+namespace stat{
+    class CSVStatOutput {
+        public:
+            CSVStatOutput( const std::string& stat_file = "statistic.txt") ;
+            ~CSVStatOutput();
+            void write(uint64_t timestamp, Statistic* stat);
+        private:
+            std::string fname;
+            std::fstream file;
+    };
+}
 #endif

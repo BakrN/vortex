@@ -20,7 +20,7 @@ class StatEngine {
     private:
         std::string fname;  // file name
         std::vector<std::pair<std::unique_ptr<Statistic>, bool> > stats; // Statistic , resetOnOutput
-        StatOutput output;
+        CSVStatOutput output;
 };
 
 }

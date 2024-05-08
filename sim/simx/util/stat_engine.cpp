@@ -18,7 +18,7 @@ Statistic* StatEngine::registerStatistic(std::string name, bool resetOnOutput) {
 
 void StatEngine::outputStatistics(uint64_t timestamp) {
     for (auto& stat : stats) {
-        //output.write(timestamp, stat.first->getName(), stat.first->getSum(), stat.first->getCount(), stat.first->getMax(), stat.first->getMin());
+        output.write(timestamp, stat.first.get());
         if (stat.second) {
             stat.first->reset();
         }
