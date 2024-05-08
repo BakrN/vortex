@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -45,7 +45,7 @@ module VX_operands import VX_gpu_pkg::*; #(
 
         reg [`NUM_THREADS-1:0][`XLEN-1:0] rs1_data, rs1_data_n;
         reg [`NUM_THREADS-1:0][`XLEN-1:0] rs2_data, rs2_data_n;
-        reg [`NUM_THREADS-1:0][`XLEN-1:0] rs3_data, rs3_data_n;   
+        reg [`NUM_THREADS-1:0][`XLEN-1:0] rs3_data, rs3_data_n;
 
         reg [STATE_BITS-1:0] state, state_n;
         reg [`NR_BITS-1:0] rs2, rs2_n;
@@ -56,7 +56,7 @@ module VX_operands import VX_gpu_pkg::*; #(
 
         wire is_rs1_zero = (scoreboard_if[i].data.rs1 == 0);
         wire is_rs2_zero = (scoreboard_if[i].data.rs2 == 0);
-        wire is_rs3_zero = (scoreboard_if[i].data.rs3 == 0);        
+        wire is_rs3_zero = (scoreboard_if[i].data.rs3 == 0);
 
         VX_operands_if staging_if();
 
@@ -84,8 +84,8 @@ module VX_operands import VX_gpu_pkg::*; #(
                 end
                 if (scoreboard_if[i].valid && data_ready_n == 0) begin
                     data_ready_n = 1;
-                    if (is_rs3_zero || (CACHE_ENABLE != 0 && 
-                                        scoreboard_if[i].data.rs3 == cache_reg[scoreboard_if[i].data.wis] && 
+                    if (is_rs3_zero || (CACHE_ENABLE != 0 &&
+                                        scoreboard_if[i].data.rs3 == cache_reg[scoreboard_if[i].data.wis] &&
                                         (scoreboard_if[i].data.tmask & cache_tmask[scoreboard_if[i].data.wis]) == scoreboard_if[i].data.tmask)) begin
                         rs3_data_n   = (is_rs3_zero || CACHE_ENABLE == 0) ? '0 : cache_data[scoreboard_if[i].data.wis];
                         rs3_ready_n  = 1;
@@ -95,8 +95,8 @@ module VX_operands import VX_gpu_pkg::*; #(
                         data_ready_n = 0;
                         state_n      = STATE_FETCH3;
                     end
-                    if (is_rs2_zero || (CACHE_ENABLE != 0 && 
-                                        scoreboard_if[i].data.rs2 == cache_reg[scoreboard_if[i].data.wis] && 
+                    if (is_rs2_zero || (CACHE_ENABLE != 0 &&
+                                        scoreboard_if[i].data.rs2 == cache_reg[scoreboard_if[i].data.wis] &&
                                         (scoreboard_if[i].data.tmask & cache_tmask[scoreboard_if[i].data.wis]) == scoreboard_if[i].data.tmask)) begin
                         rs2_data_n   = (is_rs2_zero || CACHE_ENABLE == 0) ? '0 : cache_data[scoreboard_if[i].data.wis];
                         rs2_ready_n  = 1;
@@ -106,8 +106,8 @@ module VX_operands import VX_gpu_pkg::*; #(
                         data_ready_n = 0;
                         state_n      = STATE_FETCH2;
                     end
-                    if (is_rs1_zero || (CACHE_ENABLE != 0 && 
-                                        scoreboard_if[i].data.rs1 == cache_reg[scoreboard_if[i].data.wis] && 
+                    if (is_rs1_zero || (CACHE_ENABLE != 0 &&
+                                        scoreboard_if[i].data.rs1 == cache_reg[scoreboard_if[i].data.wis] &&
                                         (scoreboard_if[i].data.tmask & cache_tmask[scoreboard_if[i].data.wis]) == scoreboard_if[i].data.tmask)) begin
                         rs1_data_n   = (is_rs1_zero || CACHE_ENABLE == 0) ? '0 : cache_data[scoreboard_if[i].data.wis];
                     end else begin
@@ -149,9 +149,9 @@ module VX_operands import VX_gpu_pkg::*; #(
                 state_n = STATE_IDLE;
             end
             endcase
-            
+
             if (CACHE_ENABLE != 0 && writeback_if[i].valid) begin
-                if ((cache_reg[writeback_if[i].data.wis] == writeback_if[i].data.rd) 
+                if ((cache_reg[writeback_if[i].data.wis] == writeback_if[i].data.rd)
                  || (cache_eop[writeback_if[i].data.wis] && writeback_if[i].data.sop)) begin
                     for (integer j = 0; j < `NUM_THREADS; ++j) begin
                         if (writeback_if[i].data.tmask[j]) begin
@@ -164,7 +164,7 @@ module VX_operands import VX_gpu_pkg::*; #(
                         cache_tmask_n[writeback_if[i].data.wis] = writeback_if[i].data.tmask;
                     end else begin
                         cache_tmask_n[writeback_if[i].data.wis] |= writeback_if[i].data.tmask;
-                    end                
+                    end
                 end
             end
         end
@@ -208,7 +208,7 @@ module VX_operands import VX_gpu_pkg::*; #(
     `else
         wire wr_enabled = 1;
     `endif
-        
+
         for (genvar j = 0; j < `NUM_THREADS; ++j) begin
             VX_dp_ram #(
                 .DATAW (`XLEN),
@@ -222,7 +222,7 @@ module VX_operands import VX_gpu_pkg::*; #(
                 .clk   (clk),
                 .read  (1'b1),
                 `UNUSED_PIN (wren),
-                .write (wr_enabled && writeback_if[i].valid && writeback_if[i].data.tmask[j]),                
+                .write (wr_enabled && writeback_if[i].valid && writeback_if[i].data.tmask[j]),
                 .waddr (wis_to_addr(writeback_if[i].data.rd, writeback_if[i].data.wis)),
                 .wdata (writeback_if[i].data.data[j]),
                 .raddr (wis_to_addr(gpr_rd_rid, gpr_rd_wis)),
@@ -233,7 +233,7 @@ module VX_operands import VX_gpu_pkg::*; #(
         // staging buffer
 
         `RESET_RELAY (stg_buf_reset, reset);
-        
+
         VX_elastic_buffer #(
             .DATAW (DATAW)
         ) stg_buf (
@@ -245,7 +245,7 @@ module VX_operands import VX_gpu_pkg::*; #(
                 scoreboard_if[i].data.uuid,
                 scoreboard_if[i].data.wis,
                 scoreboard_if[i].data.tmask,
-                scoreboard_if[i].data.PC, 
+                scoreboard_if[i].data.PC,
                 scoreboard_if[i].data.wb,
                 scoreboard_if[i].data.ex_type,
                 scoreboard_if[i].data.op_type,
@@ -258,7 +258,7 @@ module VX_operands import VX_gpu_pkg::*; #(
                 staging_if.data.uuid,
                 staging_if.data.wis,
                 staging_if.data.tmask,
-                staging_if.data.PC, 
+                staging_if.data.PC,
                 staging_if.data.wb,
                 staging_if.data.ex_type,
                 staging_if.data.op_type,
@@ -266,7 +266,7 @@ module VX_operands import VX_gpu_pkg::*; #(
                 staging_if.data.use_PC,
                 staging_if.data.use_imm,
                 staging_if.data.imm,
-                staging_if.data.rd}),                                               
+                staging_if.data.rd}),
             .valid_out (staging_if.valid),
             .ready_out (staging_if.ready)
         );
@@ -297,6 +297,6 @@ module VX_operands import VX_gpu_pkg::*; #(
             .valid_out (operands_if[i].valid),
             .ready_out (operands_if[i].ready)
         );
-    end    
+    end
 
 endmodule

@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -62,7 +62,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
 
         // Store request info
         wire fpu_req_valid, fpu_req_ready;
-        wire fpu_rsp_valid, fpu_rsp_ready;    
+        wire fpu_rsp_valid, fpu_rsp_ready;
         wire [NUM_LANES-1:0][`XLEN-1:0] fpu_rsp_result;
         fflags_t fpu_rsp_fflags;
         wire fpu_rsp_has_fflags;
@@ -76,7 +76,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
         wire                    fpu_rsp_sop;
         wire                    fpu_rsp_eop;
 
-        wire [TAG_WIDTH-1:0] fpu_req_tag, fpu_rsp_tag;    
+        wire [TAG_WIDTH-1:0] fpu_req_tag, fpu_rsp_tag;
         wire mdata_full;
 
         wire [`INST_FMT_BITS-1:0] fpu_fmt = execute_if[block_idx].data.imm[`INST_FMT_BITS-1:0];
@@ -91,20 +91,20 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
         ) tag_store (
             .clk          (clk),
             .reset        (reset),
-            .acquire_en   (execute_fire), 
-            .write_addr   (fpu_req_tag), 
+            .acquire_en   (execute_fire),
+            .write_addr   (fpu_req_tag),
             .write_data   ({execute_if[block_idx].data.uuid, execute_if[block_idx].data.wid, execute_if[block_idx].data.tmask, execute_if[block_idx].data.PC, execute_if[block_idx].data.rd, execute_if[block_idx].data.pid, execute_if[block_idx].data.sop, execute_if[block_idx].data.eop}),
             .read_data    ({fpu_rsp_uuid, fpu_rsp_wid, fpu_rsp_tmask, fpu_rsp_PC, fpu_rsp_rd, fpu_rsp_pid, fpu_rsp_sop, fpu_rsp_eop}),
             .read_addr    (fpu_rsp_tag),
-            .release_en   (fpu_rsp_fire), 
+            .release_en   (fpu_rsp_fire),
             .full         (mdata_full),
             `UNUSED_PIN (empty)
         );
 
-        // resolve dynamic FRM from CSR   
-        wire [`INST_FRM_BITS-1:0] fpu_req_frm; 
+        // resolve dynamic FRM from CSR
+        wire [`INST_FRM_BITS-1:0] fpu_req_frm;
         `ASSIGN_BLOCKED_WID (fpu_to_csr_if[block_idx].read_wid, execute_if[block_idx].data.wid, block_idx, `NUM_FPU_BLOCKS)
-        assign fpu_req_frm = (execute_if[block_idx].data.op_type != `INST_FPU_MISC 
+        assign fpu_req_frm = (execute_if[block_idx].data.op_type != `INST_FPU_MISC
                            && fpu_frm == `INST_FRM_DYN) ? fpu_to_csr_if[block_idx].read_frm : fpu_frm;
 
         // submit FPU request
@@ -112,7 +112,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
         assign fpu_req_valid = execute_if[block_idx].valid && ~mdata_full;
         assign execute_if[block_idx].ready = fpu_req_ready && ~mdata_full;
 
-        `RESET_RELAY (fpu_reset, reset);   
+        `RESET_RELAY (fpu_reset, reset);
 
     `ifdef FPU_DPI
 
@@ -140,8 +140,8 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
             .has_fflags (fpu_rsp_has_fflags),
             .fflags     (fpu_rsp_fflags),
             .tag_out    (fpu_rsp_tag),
-            .ready_out  (fpu_rsp_ready)     
-        );   
+            .ready_out  (fpu_rsp_ready)
+        );
 
     `elsif FPU_FPNEW
 
@@ -151,7 +151,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
             .OUT_REG    (PARTIAL_BW ? 1 : 3)
         ) fpu_fpnew (
             .clk        (clk),
-            .reset      (fpu_reset), 
+            .reset      (fpu_reset),
 
             .valid_in   (fpu_req_valid),
             .op_type    (execute_if[block_idx].data.op_type),
@@ -160,16 +160,16 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
             .frm        (fpu_req_frm),
             .dataa      (execute_if[block_idx].data.rs1_data),
             .datab      (execute_if[block_idx].data.rs2_data),
-            .datac      (execute_if[block_idx].data.rs3_data), 
+            .datac      (execute_if[block_idx].data.rs3_data),
             .tag_in     (fpu_req_tag),
             .ready_in   (fpu_req_ready),
 
-            .valid_out  (fpu_rsp_valid), 
+            .valid_out  (fpu_rsp_valid),
             .result     (fpu_rsp_result),
             .has_fflags (fpu_rsp_has_fflags),
             .fflags     (fpu_rsp_fflags),
-            .tag_out    (fpu_rsp_tag), 
-            .ready_out  (fpu_rsp_ready)        
+            .tag_out    (fpu_rsp_tag),
+            .ready_out  (fpu_rsp_ready)
         );
 
     `elsif FPU_DSP
@@ -180,7 +180,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
             .OUT_REG    (PARTIAL_BW ? 1 : 3)
         ) fpu_dsp (
             .clk        (clk),
-            .reset      (fpu_reset), 
+            .reset      (fpu_reset),
 
             .valid_in   (fpu_req_valid),
             .lane_mask  (execute_if[block_idx].data.tmask),
@@ -189,18 +189,18 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
             .frm        (fpu_req_frm),
             .dataa      (execute_if[block_idx].data.rs1_data),
             .datab      (execute_if[block_idx].data.rs2_data),
-            .datac      (execute_if[block_idx].data.rs3_data), 
+            .datac      (execute_if[block_idx].data.rs3_data),
             .tag_in     (fpu_req_tag),
             .ready_in   (fpu_req_ready),
 
-            .valid_out  (fpu_rsp_valid), 
-            .result     (fpu_rsp_result), 
+            .valid_out  (fpu_rsp_valid),
+            .result     (fpu_rsp_result),
             .has_fflags (fpu_rsp_has_fflags),
             .fflags     (fpu_rsp_fflags),
             .tag_out    (fpu_rsp_tag),
             .ready_out  (fpu_rsp_ready)
         );
-        
+
     `endif
 
         // handle FPU response
@@ -220,7 +220,7 @@ module VX_fpu_unit import VX_fpu_pkg::*; #(
         end else begin
             assign fpu_rsp_fflags_q = fpu_rsp_fflags;
         end
-        
+
         assign fpu_to_csr_if[block_idx].write_enable = fpu_rsp_fire && fpu_rsp_eop && fpu_rsp_has_fflags;
         `ASSIGN_BLOCKED_WID (fpu_to_csr_if[block_idx].write_wid, fpu_rsp_wid, block_idx, `NUM_FPU_BLOCKS)
         assign fpu_to_csr_if[block_idx].write_fflags = fpu_rsp_fflags_q;
