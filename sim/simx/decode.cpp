@@ -749,9 +749,15 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
             // accumulation source is register
             std::cout << "reg file "  << rs3;
             instr->addSrcReg(rs3, RegType::Float);
-        } else {
+        } else if (func2==2){
+            // acc src is tile row
             std::cout << "acc buffer " << rs3;
             instr->addSrcReg(rs3, RegType::TC);
+        }
+        else {
+            // acc src is tile row
+            instr->setImm(rs3);
+            std::cout << "acc imm" << rs3;// 0 pad immediate (potentially more useful immediate generators?)
         }
         std::cout << std::endl ;
 

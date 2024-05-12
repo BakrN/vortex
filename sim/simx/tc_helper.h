@@ -160,6 +160,13 @@ class ChunkVector{
             return chunks[chunk];
         }
 
+        void fillZero() {
+            while (!this->isFull()) {
+                this->insert(0);
+            }
+
+        }
+
 
     private:
         int num_chunks;
@@ -231,6 +238,10 @@ public:
 
   int size() {
       return m_data.front().size();
+  }
+
+  void zeroBackRow() {
+      m_data.back().fillZero() ;
   }
 
 

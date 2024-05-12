@@ -106,7 +106,13 @@ pipeline_trace_t* Warp::eval() {
             trace->tc_type = TCOpType::ACC_BUF;
         }
     } else {
-        trace->tc_type = TCOpType::NO_ACC;
+        if (instr->hasImm()) {
+            // Load in 0 or specific value
+            trace->rsrc3= instr->getImm();
+            trace->tc_type = TCOpType::ACC_IMM;
+        } else {
+            trace->tc_type = TCOpType::NO_ACC;
+        }
     }
   }
 

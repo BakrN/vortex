@@ -60,7 +60,7 @@ public:
   //--
   uint32_t    rsrc1=-1;
   uint32_t    rsrc2=-1;
-  uint32_t    rsrc3=-1;
+  uint32_t    rsrc3=-1; // stores immediate value for tensor core as well
   uint32_t    rdest;
   RegType     rdest_type;
   bool        wb;

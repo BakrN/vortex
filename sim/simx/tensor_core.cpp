@@ -176,17 +176,7 @@ void TensorCore::handleInput(){
 
             auto pe = t % m_config.num_pes;
 
-            if (trace->tc_type == vortex::TCOpType::ACC_REG) {
-                c = warp->freg_file_.at(t)[trace->rsrc3];
-                pe_grp.matc(wid).insert(c,pe);
-            }
-            else if(trace->tc_type == vortex::TCOpType::ACC_BUF) {
-                // fetch from mat tile accumulator
-                auto row = 0; // row is dependent on tid
-                auto col = trace->rsrc3;
-                c = m_pe_groups[grp].getAccMat(row, col);
-                pe_grp.matc(wid).insert(c, pe);
-            }
+
 
 
             pe_grp.mata(wid).insert(A.first, pe );
@@ -194,6 +184,25 @@ void TensorCore::handleInput(){
 
             pe_grp.matb(wid).insert(B.first, pe);
             pe_grp.matb(wid).insert(B.second, pe);
+
+            if (trace->tc_type == vortex::TCOpType::ACC_REG) {
+                // assert back is not full
+                assert(!pe_grp.matc(wid).isBackFull()) ;
+                c = warp->freg_file_.at(t)[trace->rsrc3];
+                pe_grp.matc(wid).insert(c,pe);
+            }
+            else if(trace->tc_type == vortex::TCOpType::ACC_BUF) { // Only mention this once
+                // fetch from mat tile accumulator
+                // assertion here that back is empty
+                assert(!pe_grp.matc(wid).isBackEmpty());
+                auto row = trace->rsrc3;
+                for (size_t col = 0;  col < m_config.num_pes; col++){
+                    c = m_pe_groups[grp].getAccMat(row, col);
+                    pe_grp.matc(wid).insert(c, pe);
+                }
+            } else {
+                pe_grp.matc(wid).zeroBackRow();
+            }
 
             // print t, pe , grp , warp_id
             std::cout << "t: " << t << " pe: " << pe << " grp: " << grp << " warp_id: " << wid
