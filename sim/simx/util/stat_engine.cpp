@@ -11,8 +11,7 @@ StatEngine::~StatEngine() {
 }
 
 Statistic* StatEngine::registerStatistic(std::string name, bool resetOnOutput) {
-    auto pair = std::make_pair(std::make_unique<Statistic>(name), resetOnOutput);
-    stats.emplace_back(pair);
+    stats.emplace_back(std::make_pair(std::make_unique<Statistic>(name), resetOnOutput));
     return stats.back().first.get();
 }
 

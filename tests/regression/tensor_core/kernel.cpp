@@ -21,7 +21,6 @@
 
 
 
-#define DEBUG
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 
@@ -63,11 +62,11 @@ int main() {
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
    // Main GEMM (simple 1 warp impl)
    for (int i = 0 ; i < MAT_M; i+=tc_m) {
-       A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
-       C_ptr=C_start + MAT_K*i; // ROW MAJOR
+       C_ptr=C_start + MAT_N*i; // ROW MAJOR
        for (int j = 0; j < MAT_N ; j+=tc_n){
+           A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
            B_ptr=B_start+ MAT_K*j*PREC_RATIO;  // COL MAJOR
-           C_ptr=C_start +j; // ROW MAJOR
+
            // load c (OPTIMIZATION)
            tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            for (int k = 0 ; k < MAT_K; k+=tc_k){
@@ -77,7 +76,7 @@ int main() {
                #ifdef DEBUG
 
                    vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=2) {
+                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
                        uint32_t* val = (uint32_t*)(&regA[idx]);
                        uint16_t _first = (uint16_t)(*val >> 16);
                        uint16_t _second = (uint16_t)(*val & 0xFFFF);
@@ -116,6 +115,7 @@ int main() {
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * PREC_RATIO; // assumiming col_major
            }
+           C_ptr=C_ptr + tc_n ; // ROW MAJOR
            // Storage strategy can change here
            tc_store<float,1, tc_n>(thread_id , 0 , MAT_N, /*d_layout,*/ (float*)regC, (float*)D_ptr);
        }

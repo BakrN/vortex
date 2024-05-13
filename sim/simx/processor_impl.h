@@ -18,7 +18,7 @@
 #include "constants.h"
 #include "dcrs.h"
 #include "cluster.h"
-#include <stat_engine.h>
+#include <util/stat_engine.h>
 
 
 class vx_device;

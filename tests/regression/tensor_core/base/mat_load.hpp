@@ -176,19 +176,19 @@ template <typename T, int OP_size, int Res_size,
 inline void tc_load_fragment_c(T* ptr, T* reg, const int thread_id, const int MAT_M, const int MAT_N){
     constexpr int col_groups = TC_N / TILE_COLS;
     const int pe_group_id = thread_id  / NUM_PE_PER_GROUP; // number of pes
-    const int col_group = (pe_group_id / TILE_COLS) % col_groups; // determines HW config
+    const int col_group = pe_group_id % col_groups; // determines HW config
     const int row_group = pe_group_id / (TILE_ROWS * col_groups); // determines HW config
 
     if constexpr (layout == layout_t::ROW_MAJOR) {
         //vx_printf("(%d) C(rm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
-        auto c_row_offset = MAT_M*(row_group * TILE_ROWS + (thread_id % TILE_ROWS));
+        auto c_row_offset = MAT_N*(row_group * TILE_ROWS + (thread_id % TILE_ROWS));
         auto c_col_offset = col_group*TILE_COLS;
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
         unrolled_load_row_row_major<0, 0,TILE_COLS,1,  T>(c_row_ptr, reg, MAT_M);
     } else {
         //vx_printf("(%d) C(cm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
         auto c_row_offset = row_group * TILE_ROWS + (thread_id % TILE_ROWS);
-        auto c_col_offset = MAT_N*(col_group*TILE_COLS);
+        auto c_col_offset = MAT_M*(col_group*TILE_COLS);
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
         unrolled_load_row_col_major<0, 0,TILE_COLS,1,  T>(c_row_ptr, reg, MAT_N);
     }
@@ -235,7 +235,7 @@ template <typename T, int OP_size, int Res_size,
 inline void tc_load_fragment_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, const int MAT_K) {
     constexpr int col_groups = TC_N / TILE_COLS;
     const int pe_group_id = thread_id  / NUM_PE_PER_GROUP; // number of pes
-    const int col_group = (pe_group_id / TILE_COLS) % col_groups; // determines HW config
+    const int col_group = pe_group_id  % col_groups; // determines HW config
 
     if constexpr (layout == layout_t::ROW_MAJOR)  {
         //vx_printf("(%d) B(rm) col= %d\n", thread_id,  (col_group * TILE_COLS + thread_id % TILE_COLS));

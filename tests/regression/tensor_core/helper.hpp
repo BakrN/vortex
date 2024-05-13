@@ -1,18 +1,24 @@
 #ifndef TC_HOST_HELP_H
 #define TC_HOST_HELP_H
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <string>
+#include <iostream>
+#include <fstream>
 
 
 template <int OP_SIZE, int RES_SIZE>
-void read_matrices(const char *filename, int M, int N, int K, float**A, float**B, float**C, float** D) {
-    FILE *file = fopen(filename, "rb");
-    if (file == NULL) {
-        fprintf(stderr, "Error opening file %s\n", filename);
-        exit(1);
-    }
+void read_matrices(const std::string& dir, int M, int N, int K, float**A, float**B, float**C, float** D) {
+    std::string A_filename = dir + "/A.bin";
+    std::ifstream A_f(A_filename, std::ios::binary);
 
+    std::string B_filename = dir + "/B.bin";
+    std::ifstream B_f(B_filename, std::ios::binary);
+
+    std::string C_filename = dir + "/C.bin";
+    std::ifstream C_f(C_filename, std::ios::binary);
+
+    std::string D_filename = dir + "/D.bin";
+    std::ifstream D_f(D_filename, std::ios::binary);
 
     if (*A == NULL || *B == NULL || *C == NULL ) {
         fprintf(stderr, "Error allocating memory\n");
@@ -20,12 +26,10 @@ void read_matrices(const char *filename, int M, int N, int K, float**A, float**B
     }
 
     // Read matrices from the file
-    fread(*A, OP_SIZE, M * K, file);
-    fread(*B, OP_SIZE, K * N, file);
-    fread(*C, RES_SIZE, M * N, file);
-    fread(*D, RES_SIZE, M * N, file);
-
-    fclose(file);
+    A_f.read(reinterpret_cast<char*>(*A),OP_SIZE* M * K);
+    B_f.read(reinterpret_cast<char*>(*B),OP_SIZE* K * N);
+    C_f.read(reinterpret_cast<char*>(*C),RES_SIZE* M * N);
+    D_f.read(reinterpret_cast<char*>(*D),RES_SIZE* M * N);
 }
 
 template <typename ResT>

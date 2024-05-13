@@ -53,7 +53,7 @@ compile_commands.json
 */conform/conform
 */fibonacci/fibonacci
 */hello/hello
-# Opencl 
+# Opencl
 */opencl/blackscholes/blackscholes
 */opencl/cutcp/cutcp
 */opencl/dotproduct/dotproduct
@@ -86,6 +86,7 @@ compile_commands.json
 */regression/no_smem/no_smem
 */regression/printf/printf
 */regression/sort/sort
+*/regression/tensor_core/tensor_core*
 
 
 # KERNEL
@@ -94,3 +95,5 @@ compile_commands.json
 *.log
 
 .cache/*
+*.s
+*ramulator*.log

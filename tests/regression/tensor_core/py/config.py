@@ -13,18 +13,19 @@ parser.add_argument('--a_orientation', type=str, default='row_major', choices=['
 parser.add_argument('--b_orientation', type=str, default='col_major', choices=['row_major, col_major'], help='B Matrix internal representation ')
 parser.add_argument('--c_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='C Matrix internal representation ')
 parser.add_argument('--d_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='D Matrix internal representation ')
-parser.add_argument('--output_file', type=str, default='', help='Output file name')
 parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of threads in system')
 parser.add_argument('--num_warps', '-w', type=int, default=1, help='Number of warps')
 parser.add_argument('--num_cores', '-c', type=int, default=1, help='Number of cores')
 parser.add_argument('--num_clusters',  type=int, default=1, help='number of clusters')
 parser.add_argument('--num_pes',  type=int, default=2, help='Number of pes per group')
 parser.add_argument('--num_groups', type=int,  help='Number of pe groups', default=1)
-parser.add_argument('--operand_count', type=int, help='Number of operands in a group', default=2)
+parser.add_argument('--operand_count', type=int, help='Number of operands (determined dot unit width FP16)', default=2)
 parser.add_argument('--input_mat_buf_depth', type=int, help='Depth of input matrix buffer', default=1)
 parser.add_argument('--output_fifo_size', type=int, help='Size of output FIFO', default=1)
 parser.add_argument('--num_acc_tiles', type=int, help='Number of accumulator tiles', default=0)
-parser.add_argument('--ex_latency', type=int, help='Execution latency', default=4)
+parser.add_argument('--mul_latency', type=int, help='Multiplication latency per transprecision adder', default=1)
+parser.add_argument('--add_latency', type=int, help='Addition latency per transprecision adder', default=1)
+parser.add_argument('--num_dot_units', type=int, help='Number of dot units per PE', default=1)
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
 args = parser.parse_args()
@@ -84,36 +85,36 @@ def generate_matrices(M, N, K, A_type='fp16', B_type='fp16', C_type='fp32', D_ty
         D = D.T
     return A, B, C, D
 
-def save_matrices_to_file(A, B, C, D, filename):
-    with open(filename, 'wb') as file:
-        A.tofile(file)
-        B.tofile(file)
-        C.tofile(file)
-        D.tofile(file)
-
-
+def save_matrices_to_file(A, B, C, D):
+    with open("A.bin", 'wb') as file:
+        A.tofile("A.bin")
+    with open("B.bin", 'wb') as file:
+        B.tofile("B.bin")
+    with open("C.bin", 'wb') as file:
+        C.tofile("C.bin")
+    with open("D.bin", 'wb') as file:
+        D.tofile("D.bin")
 
 
 # For now will assume threads == num_pes
 
 #assert(args["num_pes"] == args["num_thread"], "Assuming num_pes == num_threads")
+args["num_pes"] = int(args["num_threads"] / args["num_groups"])
 print(args)
 
 
 # Print Matrices
 
-if args["output_file"]:
-    A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
-    print("----PRINTING A----")
-    print(A)
-    print("----PRINTING B----")
-    print(B)
-    print("----PRINTING C----")
-    print(C)
-    print("----PRINTING D----")
-    print(D)
-    save_matrices_to_file(A, B, C, D, args["output_file"])
-    print(f"Matrices saved to{args['output_file']}")
+A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
+print("----PRINTING A----")
+print(A)
+print("----PRINTING B----")
+print(B)
+print("----PRINTING C----")
+print(C)
+print("----PRINTING D----")
+print(D)
+save_matrices_to_file(A, B, C, D)
 
 class TCConfig:
     num_pes = 0
@@ -152,7 +153,7 @@ tc.operand_count = args["operand_count"]
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
 tc.num_acc_tiles = args["num_acc_tiles"]
-tc.execution_latency = args["ex_latency"]
+tc.execution_latency = args["mul_latency"] + int(math.ceil(math.log2(args["operand_count"])))*args["add_latency"] + 1 # The +1 is for the final accumulate (+C)
 
 # 2. System parameters
 class GEMMArgs:
@@ -182,8 +183,8 @@ system = GEMMArgs()
 # Assume M == N, no Acc tiles for now
 system.otile_row = tc.num_pes
 system.otile_col = tc.num_pes
-system.n = int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
-system.m = int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col)) #total over pe groups
+system.n = system.otile_col*tc.num_groups if tc.num_groups<=2 else int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
+system.m = system.otile_row if tc.num_groups<=2 else int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col)) #total over pe groups
 system.k = tc.operand_count # TileSizeRow
 print("TC")
 print (tc)

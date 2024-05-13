@@ -21,7 +21,7 @@ LDFLAGS += -L$(THIRD_PARTY_DIR)/ramulator -lramulator
 
 SRCS = ../common/util.cpp ../common/mem.cpp ../common/rvfloats.cpp
 SRCS += processor.cpp cluster.cpp core.cpp warp.cpp decode.cpp execute.cpp exe_unit.cpp cache_sim.cpp mem_sim.cpp shared_mem.cpp dcrs.cpp tensor_core.cpp
-SRCS += stat_engine.cpp stat_output.cpp
+SRCS += ./util/stat_engine.cpp ./util/stat_output.cpp
 
 # Debugigng
 ifdef DEBUG

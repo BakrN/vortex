@@ -108,24 +108,19 @@ void TensorCore::handleInput(){
         // Load Inputs (assumption parallel loading)
         auto wid = trace->wid;
         auto& warp = core_->warps_[trace->wid]; // can't handle multiple independent data streams for now (per row in matrix buffers can add warp tag) (also independent matrix tile buffers)
-        for (size_t t = 0 ; t < MAX_NUM_THREADS; t++) {
-            if (!trace->tmask.test(t)) {
-                continue;
-            }
-            auto grp = t/m_config.num_pes % m_pe_groups.size();
-            auto& pe_grp = m_pe_groups[grp];
-            if (!pe_grp.spaceToAccept(trace->wid)) { // if ! space to accept exit
+        // check for space and allocate meta data
+        bool accept_warp = true;
+        for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
+            if (!m_pe_groups[grp].spaceToAccept(trace->wid)) {
+                accept_warp = false;
                 break;
             }
-            if (!accepted_warp) {
-                std:: cout << "Accepted input(" << count++ << "): " << *trace << std::endl;
-                input.pop();
-                accepted_warp = true;
-                if (trace->eop) {
-                    core_->committed_instrs_++;
-                }
-
-                if (trace->rdest_type != vortex::RegType::None) { // Done only once
+        }
+        if (accept_warp) {
+            std:: cout << "Accepted input(" << count++ << "): " << *trace << std::endl;
+            input.pop();
+            if (trace->rdest_type != vortex::RegType::None) { // Done only once
+                for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
                     MATMetadata meta;
                     meta.wb = trace->wb ; // reg wb
                     meta.warp_id = wid;
@@ -135,6 +130,20 @@ void TensorCore::handleInput(){
                     m_pe_groups[grp].addMeta(meta, wid);
                 }
             }
+            if (trace->eop ) {
+                core_->committed_instrs_++;
+            }
+        } else {
+            break;
+        }
+
+        for (size_t t = 0 ; t < MAX_NUM_THREADS; t++) {
+            if (!trace->tmask.test(t)) {
+                continue;
+            }
+            auto grp = t/m_config.num_pes % m_pe_groups.size();
+            auto& pe_grp = m_pe_groups[grp];
+
             std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
             std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
             uint32_t c =0;
@@ -200,7 +209,7 @@ void TensorCore::handleInput(){
                     c = m_pe_groups[grp].getAccMat(row, col);
                     pe_grp.matc(wid).insert(c, pe);
                 }
-            } else {
+            } else if (trace->tc_type == vortex::TCOpType::ACC_IMM) {
                 pe_grp.matc(wid).zeroBackRow();
             }
 

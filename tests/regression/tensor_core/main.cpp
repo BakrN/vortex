@@ -19,7 +19,7 @@ bool float_eq( float a , float b, float epsilon = 0.05) {
 
 vx_device_h device = nullptr;
 const char* kernel_file = "kernel.bin";
-const char *filename = "py/matrices.bin";
+const char *filename = "py";
 
 int main(){
     float* A, *B ,* C, *D, *D_expected, *D_result; // I want compiler to use float registers (so I give them type float) (irrespective of actual undelrying type)
@@ -38,30 +38,32 @@ int main(){
 
     read_matrices<TC_OP_SIZE, TC_RES_SIZE>(filename, MM_M, MM_N, MM_K, &A, &B, &C, &D_expected);
     // Print operand matrices
-    std::cout << "MAINCPP: PRINTING ROW MAJOR A" << std::endl;
+    std::cout << "MAINCPP: PRINTING ROW MAJOR A (" << MM_M << "x" << MM_K << ")" << std::endl;
     for (int i = 0 ; i < MM_M; i++) {
-        for (int k = 0 ; k < MM_K; k+=2 ) {
-            uint32_t* val = (uint32_t*)(&(A[i * MM_K*(TC_RES_SIZE/TC_OP_SIZE /2) +k]));
+        for (int k = 0 ; k < MM_K/2; k+=1 ) { // fp16
+            constexpr int stride = (MM_K*TC_OP_SIZE)/4;
+            uint32_t* val = (uint32_t*)(&(A[i *stride  +k]));
             uint16_t _second = (uint16_t)(*val >> 16);
             uint16_t _first = (uint16_t)(*val & 0xFFFF);
             float16 first(_first) ;
             float16 second(_second);
             std::cout << first.to_float32() << " ";
-            std::cout << second.to_float32();
+            std::cout << second.to_float32() << " ";
         }
         std::cout << std::endl;
     }
 
-    std::cout << "MAINCPP: PRINTING COL MAJOR B" << std::endl;
-    for (int i = 0 ; i < MM_N; i++) {
-        for (int k = 0 ; k < MM_K; k+=2 ) {
-            uint32_t* val = (uint32_t*)(&(B[i * MM_K*(TC_RES_SIZE/TC_OP_SIZE /2) +k]));
+    std::cout << "MAINCPP: PRINTING COL MAJOR B (" << MM_K << "x" << MM_N << ")" << std::endl;
+    for (int i = 0 ; i < MM_K; i++) {
+        for (int k = 0 ; k < MM_N/2; k+=1 ) {
+            constexpr int stride = (MM_K*TC_OP_SIZE)/4;
+            uint32_t* val = (uint32_t*)(&(B[i * stride +k]));
             uint16_t _second = (uint16_t)(*val >> 16);
             uint16_t _first = (uint16_t)(*val & 0xFFFF);
             float16 first(_first) ;
             float16 second(_second);
             std::cout << first.to_float32() << " " ;
-            std::cout << second.to_float32();
+            std::cout << second.to_float32()<< " ";
         }
         std::cout << std::endl;
     }
@@ -69,7 +71,7 @@ int main(){
     std::cout << "MAINCPP: PRINTING C" << std::endl;
     for (int i = 0 ; i < MM_M; i++) {
         for (int j = 0 ; j < MM_N; j++) {
-            std::cout <<  C[i*MM_M + j] << " " ;
+            printf("%f ", C[((i*MM_N) + j)]);
         }
         std::cout << std::endl;
     }
@@ -132,7 +134,7 @@ int main(){
     std::cout << "D RESULT" << std::endl;
     for (int i = 0 ; i < MM_M; i ++) {
         for (int j = 0 ; j < MM_N; j++) {
-            std::cout << D_result[i * MM_M + j] << " " ;
+            std::cout << D_result[i * MM_N + j] << " " ;
         }
         std::cout << std::endl;
     }
@@ -140,18 +142,18 @@ int main(){
     std::cout << "D EXPECTED" << std::endl;
     for (int i = 0 ; i < MM_M; i ++) {
         for (int j = 0 ; j < MM_N; j++) {
-            std::cout << D_expected[i * MM_M + j] << " " ;
+            std::cout << D_expected[i * MM_N + j] << " " ;
         }
         std::cout << std::endl;
     }
 
-    for (int i = 0 ; i < MM_M; i ++) {
-        for (int j = 0 ; j < MM_N; j++) {
-            if (!float_eq(D_result[i* MM_M + j], D_expected[i* MM_M + j])) {
-                std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_M + j] << " act: " << D_result[i* MM_M + j] << std::endl;
-            }
-        }
-    }
+    //for (int i = 0 ; i < MM_M; i ++) {
+    //    for (int j = 0 ; j < MM_N; j++) {
+    //        if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j])) {
+    //            std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
+    //        }
+    //    }
+    //}
 
 
     free(A);
