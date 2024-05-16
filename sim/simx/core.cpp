@@ -90,8 +90,6 @@ Core::Core(const SimContext& ctx,
   tc_config.num_pes = TC_NUM_PES;
   tc_config.operand_count = TC_OP_COUNT;
   tc_config.input_mat_buf_depth = TC_MAT_BUF_DEPTH;
-  tc_config.acc_buf_rows = TC_ACC_BUF_ROWS;
-  tc_config.acc_buf_cols = TC_ACC_BUF_COLS;
   tc_config.output_fifo_size = TC_OUTPUT_FIFO_SIZE;
   tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
 

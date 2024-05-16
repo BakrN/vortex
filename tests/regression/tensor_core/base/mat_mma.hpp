@@ -204,7 +204,7 @@ inline void mat_mma_unroll (float** regA, float** regB,  typename AccsrcSelector
  * @brief Tensor core matrix multiplication with accumulation in register file and write back to register file
  * */
 template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, bool IN_PLACE =true>
-inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float* regD) {
+inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float* regD=nullptr) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     static_assert(num_loads >= STEPS, "Steps cannot be larger than number of loads when using register file as accumulator. Because if steps is more that means my C register per PE is not entirely filled");
     // if it's equal to 1 then just store back directly
@@ -228,7 +228,7 @@ inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float
 }
 
 /**
- * @brief Tensor core matrix multiplication with accumulation in buffer and write back to buffer
+ * @brief Tensor core matrix multiplication with source accumulation in buffer and intermediate write backs to buffer
  * */
 template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, bool IN_PLACE =true>
 inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB , const int acc_tile=0) {

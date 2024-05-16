@@ -115,6 +115,10 @@ int main(){
     kernel_args.N_ = MM_N;
     kernel_args.K_ = MM_K;
 
+
+    kernel_args.num_tasks = NUM_CORES* NUM_THREADS * NUM_WARPS; // how many threads warps etc... warps / cores to launch
+    std::cout << "NUM CORES: " << NUM_CORES << " NUM WARPS: " << NUM_WARPS << " NUM THREADS: " << NUM_THREADS << std::endl;
+
     // copy operand data to device
     vx_copy_to_dev(device, A_ADDR, A, A_bytes);
     vx_copy_to_dev(device, B_ADDR, B, B_bytes);

@@ -9,11 +9,11 @@ python config.py --config config.json
 tc_defines=`cat defines.txt`
 cd ..
 
-cd ../../../
-cd runtime/simx
-make clean
-
-make EXTFLAGS+="${tc_defines}" 
+#cd ../../../
+#cd runtime/simx
+#make clean
+#
+#make EXTFLAGS+="${tc_defines}" 
 
 cd $cur
 

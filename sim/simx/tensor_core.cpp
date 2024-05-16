@@ -7,8 +7,7 @@
 #include <cstring>
 
 
-PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t acc_buf_rows, size_t acc_buf_cols, size_t output_fifo_size, size_t num_acc_tiles)  :
-    m_tile_accumulator(acc_buf_rows,acc_buf_cols, num_acc_tiles),
+PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t output_fifo_size, size_t num_acc_tiles)  :
     m_num_pes(num_pes)
 {
     m_wb_meta.resize(MAX_NUM_WARPS);
@@ -16,6 +15,7 @@ PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth
         m_mat_a[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
         m_mat_b[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
         m_mat_c[i] = MATBuffer<uint32_t>(num_pes, input_mat_buf_depth,num_pes);
+        m_tile_accumulator.emplace_back(AccBuffer<uint32_t>(num_pes, num_acc_tiles));
         m_cur_step[i] = 0;
     }
     for (size_t i = 0; i < num_pes; i++) {
@@ -38,13 +38,6 @@ void PEGroup::popOperands(int wid) {
     m_cur_step[wid] = 0 ;
 }
 
-void PEGroup::setAccMat(size_t row, size_t col, uint32_t data){
-    m_tile_accumulator.setData(row, col, data);
-}
-
-uint32_t PEGroup::getAccMat(size_t row, size_t col) {
-    return m_tile_accumulator.getData(row, col);
-}
 
 PEGroup::~PEGroup() {
 
@@ -54,7 +47,7 @@ TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t confi
     m_config.print();
     // initialize the PE Groups
     for (size_t i = 0; i < config.num_pe_groups; i++) {
-        PEGroup grp(config.num_pes, config.operand_count, config.input_mat_buf_depth, config.acc_buf_rows, config.acc_buf_cols, config.output_fifo_size, config.num_acc_tiles);
+        PEGroup grp(config.num_pes, config.operand_count, config.input_mat_buf_depth, config.output_fifo_size, config.num_acc_tiles);
         m_pe_groups.emplace_back(grp);
     }
 }
@@ -202,11 +195,11 @@ void TensorCore::handleInput(){
             }
             else if(trace->tc_type == vortex::TCOpType::ACC_BUF) { // Only mention this once
                 // fetch from mat tile accumulator
-                // assertion here that back is empty
-                assert(!pe_grp.matc(wid).isBackEmpty());
-                auto row = trace->rsrc3;
+                // (might need to stall if prev instruction not yet done...)
+                assert(!pe_grp.matc(wid).isBackEmpty()); // assertion here that back is empty
+                auto tile = trace->rsrc3;
                 for (size_t col = 0;  col < m_config.num_pes; col++){
-                    c = m_pe_groups[grp].getAccMat(row, col);
+                    c = m_pe_groups[grp].tileAccumulator(wid).read(tile);
                     pe_grp.matc(wid).insert(c, pe);
                 }
             } else if (trace->tc_type == vortex::TCOpType::ACC_IMM) {
@@ -278,8 +271,20 @@ void TensorCore::compute(){
 void TensorCore::queueToOutput(){
     while(!m_timing.empty()){
         auto& e = m_timing.front();
+        auto& [meta, result, pe_id] = e.second;
+        if (!meta.wb) {
+            // write back result to intermediate buf and pop. Can ignore timing because I assume latency of compute overlaps with next operand coming in and reaching last reduction stage.
+            // I'm basically assuming stalls will only happen due to A and B loading in this case.
+            auto& [grp, pe] = pe_id;
+            m_pe_groups[grp].tileAccumulator(meta.warp_id).insert(result, meta.rd);
+            m_timing.pop();
+            float f_res = 0 ;
+            float* ptr = reinterpret_cast<float*>(&result);
+            std::memcpy(&f_res, ptr, sizeof(float));
+            std::cout << "Queue to output TILE" << grp << " pe: " << pe << " : warp_id: " << meta.warp_id << " tile: " << meta.rd << " val: " << f_res << std::endl;
+            continue;
+        }
         if (e.first <= m_cycle) {
-            auto& [meta, result, pe_id] = e.second;
             auto& [grp, pe] = pe_id;
 
             m_pe_groups[grp].insertOutput(pe, meta, result);

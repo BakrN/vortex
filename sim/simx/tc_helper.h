@@ -12,63 +12,6 @@
 #include <limits>
 #include <cmath>
 
-template <typename T>
-
-struct FIFO {
-    public:
-        FIFO(size_t size): m_size(size) {
-            assert(size) ;
-            m_data.resize(size);
-            m_tail = 0 ;
-            m_head = 0 ;
-            m_reserved =0 ;
-        }
-        ~FIFO(){
-        }
-
-        void push(T data){
-            assert(!isFull());
-            m_data[m_head] = data;
-            m_head = (m_head + 1) % (m_size+1);
-            if( m_reserved){
-                m_reserved-- ;
-            }
-        }
-
-        T pop(){
-            assert(!isEmpty());
-            T data = m_data[m_tail];
-            m_tail= (m_tail+ 1) % (m_size+1);
-            return data;
-        }
-
-        T& front(){
-            return m_data[m_tail];
-        }
-
-        T& back(){
-            return m_data[m_head];
-        }
-
-        bool isFull() {
-            return ((m_head+m_reserved+1) % (m_size+1)) == m_tail && !(m_head == 0 && m_tail == 0) ;
-        }
-
-        bool isEmpty() {
-            return m_head == m_tail;
-        }
-
-        void reserve(){
-            assert(!isFull());
-            m_reserved++;
-        }
-    private:
-        std::vector<T> m_data;
-        size_t m_head;
-        size_t m_reserved;
-        size_t m_tail;
-        const size_t m_size;
-} ;
 
 struct MATMetadata {
     bool wb ;
@@ -76,8 +19,6 @@ struct MATMetadata {
     uint16_t rd;
     std::bitset<MAX_NUM_THREADS> tmask;
 };
-
-
 
 
 template <typename T>
@@ -258,39 +199,36 @@ private:
 template <typename T = uint32_t>
 class AccBuffer { // Accumulator buffer
     public:
-        AccBuffer(size_t num_rows,
-                  size_t num_cols,
-                  size_t num_acc_tiles
-                  ) : m_num_rows(num_rows),
-                      m_num_cols(num_cols),
-                      m_num_acc_tiles(num_acc_tiles)
-        {
-
+        AccBuffer() {}
+        AccBuffer(size_t num_cols ,
+                  size_t num_tiles
+                  ) : m_num_cols(num_cols), m_num_tiles(num_tiles), m_head(0), m_tail(0) {
+            m_data.resize(num_tiles);
+            for (size_t i = 0 ; i < num_tiles; i++){
+                m_data[i].resize(num_cols,0);
+            }
         }
+
         ~AccBuffer() {
         }
 
-        T getData(size_t row , size_t col) {
-            return m_data[row][col];
+        T read(size_t tile=0) {
+            return m_data[tile][m_tail];
+            m_tail += 1;
         }
 
-        void setData(size_t row, size_t col, T data) {
-            m_data[row][col] = data;
+        void insert(T value, size_t tile=0) {
+            m_data[tile][m_head] = value;
+            m_head = (m_head+1) % m_num_cols;
         }
-
-        void clear(){
-            m_head_index = 0;
-        }
-
 
     private:
-        T** m_data;
-        T* m_head;
-        size_t m_num_rows;
+        std::vector<std::vector<T>> m_data;
+        size_t m_head;
+        size_t m_tail;
         size_t m_num_cols;
-        size_t m_num_acc_tiles;
+        size_t m_num_tiles;
 
-        uint32_t m_head_index;
 };
 
 

@@ -23,6 +23,8 @@ struct kernel_arg_t{
     unsigned int M_;
     unsigned int N_;
     unsigned int K_;
+
+    int num_tasks;
 };
 
 struct float16 {

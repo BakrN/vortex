@@ -52,8 +52,6 @@ class PEGroup {
             size_t num_pes,
             size_t operand_count,
             size_t input_mat_buf_depth, // Operands fifo depth
-            size_t acc_buf_rows, // how much of the tile I can save  // State machine or compiler
-            size_t acc_buf_cols, // how much of the tile I can save  // State machine or compiler
             size_t output_fifo_size,
             size_t num_acc_tiles
             );
@@ -65,9 +63,6 @@ class PEGroup {
 
         size_t getNumPEs() {return m_num_pes; };
 
-
-        void setAccMat(size_t row, size_t col, uint32_t data);
-        uint32_t getAccMat(size_t row, size_t col);
 
         void insertOutput(size_t pe_id, MATMetadata meta, uint32_t val);
 
@@ -110,6 +105,7 @@ class PEGroup {
         }
 
 
+
         void reserveOutput() {
             for (auto& e: m_output_fifo)
                 e.reserve();
@@ -117,6 +113,7 @@ class PEGroup {
         MATBuffer<uint16_t>& mata  (int wid) { return m_mat_a[wid]; }
         MATBuffer<uint16_t>& matb  (int wid) { return m_mat_b[wid]; }
         MATBuffer<uint32_t>& matc  (int wid) { return m_mat_c[wid]; }
+        AccBuffer<uint32_t>& tileAccumulator(int wid) { return m_tile_accumulator[wid];}
         TCOutputFifo& getOutputFIFO(size_t pe) { return m_output_fifo[pe]; }
 
 
@@ -125,7 +122,7 @@ class PEGroup {
         MATBuffer<uint16_t> m_mat_a[MAX_NUM_WARPS]; // max number of warps
         MATBuffer<uint16_t> m_mat_b[MAX_NUM_WARPS];
         MATBuffer<uint32_t> m_mat_c[MAX_NUM_WARPS];
-        AccBuffer<uint32_t> m_tile_accumulator;
+        std::vector<AccBuffer<uint32_t>> m_tile_accumulator;
 
         std::vector<TCOutputFifo> m_output_fifo; // 1 per PE (warp_id, reg, val)
         std::vector<std::queue<MATMetadata>> m_wb_meta;
@@ -147,8 +144,6 @@ class TensorCore : public vortex::ExeUnit{
             size_t num_pes;
             size_t operand_count;
             size_t input_mat_buf_depth;
-            size_t acc_buf_rows;
-            size_t acc_buf_cols;
             size_t output_fifo_size;
             size_t num_acc_tiles;
             // UNUSED FOR NOW
@@ -161,8 +156,6 @@ class TensorCore : public vortex::ExeUnit{
                 std::cout << "num_pes: " << num_pes << std::endl;
                 std::cout << "operand_count: " << operand_count << std::endl;
                 std::cout << "input_mat_buf_depth: " << input_mat_buf_depth << std::endl;
-                std::cout << "acc_buf_rows: " << acc_buf_rows << std::endl;
-                std::cout << "acc_buf_cols: " << acc_buf_cols << std::endl;
                 std::cout << "output_fifo_size: " << output_fifo_size << std::endl;
                 std::cout << "num_acc_tiles: " << num_acc_tiles << std::endl;
                 std::cout << "operand_count_b: " << operand_count_b << std::endl;
