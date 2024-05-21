@@ -221,7 +221,9 @@ void TensorCore::handleInput(){
 
 void TensorCore::compute(){
     // select a warp to process
+    size_t used_dot_units = 0;
     for(int wid = 0 ; wid < MAX_NUM_WARPS;wid++) { // priority based
+        bool fired = false;
         for(size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
             // pop already processed top row
             if (m_pe_groups[grp].matb(wid).isFrontFull() && m_pe_groups[grp].getStep(wid) == m_config.num_pes){
@@ -231,6 +233,7 @@ void TensorCore::compute(){
             }
             // otherwise process new loaded row
             else if (m_pe_groups[grp].isReadyToFire(wid) ){ // let's assume i always write back for now
+                fired = true;
                 //core_->issued_ins
                 std::cout << "Compute: ready to fire GRP: " << grp <<  std::endl;
                 MATMetadata meta = m_pe_groups[grp].frontMeta(wid);
@@ -264,6 +267,12 @@ void TensorCore::compute(){
                 }
                 m_pe_groups[grp].step(wid);
             }
+        }
+        if (fired) {
+            used_dot_units++;
+        }
+        if (used_dot_units == m_config.num_dot_units) {
+            break;
         }
     }
 }

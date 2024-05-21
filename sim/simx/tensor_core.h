@@ -147,7 +147,7 @@ class TensorCore : public vortex::ExeUnit{
             size_t output_fifo_size;
             size_t num_acc_tiles;
             // UNUSED FOR NOW
-            size_t operand_count_b;
+            size_t num_dot_units=1;
 
             void print(){
                 std::cout << "TensorCore Config: " << std::endl;
@@ -158,7 +158,7 @@ class TensorCore : public vortex::ExeUnit{
                 std::cout << "input_mat_buf_depth: " << input_mat_buf_depth << std::endl;
                 std::cout << "output_fifo_size: " << output_fifo_size << std::endl;
                 std::cout << "num_acc_tiles: " << num_acc_tiles << std::endl;
-                std::cout << "operand_count_b: " << operand_count_b << std::endl;
+                std::cout << "num_dot_units: " << num_dot_units<< std::endl;
             }
         };
         TensorCore(const SimContext& ctx, vortex::Core*, Config_t config);
