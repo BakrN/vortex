@@ -57,8 +57,8 @@ class PEGroup {
             );
         ~PEGroup();
 
-        bool spaceToAccept(int wid ) {
-            return !m_mat_a[wid].isFull() &&  !m_mat_b[wid].isFull() && !m_mat_c[wid].isFull();
+        bool spaceToAccept(vortex::pipeline_trace_t* trace) {
+            return !m_mat_a[trace->wid].isFull() &&  !m_mat_b[trace->wid].isFull() && (!m_mat_c[trace->wid].isFull() || (trace->tc_type != vortex::TCOpType::ACC_REG));
         }
 
         size_t getNumPEs() {return m_num_pes; };
@@ -92,6 +92,10 @@ class PEGroup {
             auto& meta = m_wb_meta[wid].front();
             return m_mat_a[wid].isFrontFull() && m_mat_b[wid].isFrontFull() && m_mat_c[wid].isFrontFull() && // operands available
             (meta.wb ? m_output_fifo[0].canReserve() : true);
+        }
+
+        bool isMetaEmpty(int wid) {
+            return m_wb_meta[wid].empty();
         }
 
         uint32_t step(int wid) {
@@ -169,7 +173,7 @@ class TensorCore : public vortex::ExeUnit{
         // Ticks functions
         void handleInput();
         void compute(); // queue output stuff after N cycles
-        void queueToOutput();
+        void queueWriteback();
         void drainOutQueue();
         vortex::pipeline_trace_t* createInternalTrace(const MATMetadata&);
 

@@ -35,6 +35,35 @@ template <typename T,
 }
 
 
+// Instrinsic for tc flush
+
+template <typename T, int COL_WIDTH, int loop_idx=0>
+inline void tc_flush(T* dest, const int acc_tile) {
+
+    asm volatile(".insn i %[EXT], %[imm], %[rd], f%[rs1], %[func3] " :
+                [rd] "=f" (*dest) :
+                [EXT] "i" (0x7c) ,
+                [func3] "i" (0),
+                [imm] "i" (0),
+                [rs1] "i" (acc_tile)
+            );
+    if constexpr (loop_idx <COL_WIDTH-1) {
+        tc_flush<T,COL_WIDTH, loop_idx+1>(dest+1, acc_tile);
+    }
+}
+
+/*
+ * flush all tiles
+ */
+
+template <typename T, int COL_WIDTH, int NUM_TILES, int start_tile=0, int loop_idx=0>
+inline void tc_flush_tiles(T* dest) {// flush
+    tc_flush<T, COL_WIDTH/NUM_TILES, 0>(dest, start_tile + loop_idx);
+    if constexpr (loop_idx < NUM_TILES-1) {
+        tc_flush_tiles<T, COL_WIDTH, NUM_TILES, start_tile, loop_idx+1>(dest +COL_WIDTH);
+    }
+}
+
 
 /* TODO
  * Flush Tensor Core tile buffer to memory

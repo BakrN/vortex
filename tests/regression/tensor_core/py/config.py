@@ -182,9 +182,39 @@ class GEMMArgs:
 system = GEMMArgs()
 # Assume M == N, no Acc tiles for now
 system.otile_row = tc.num_pes
-system.otile_col = tc.num_pes
-system.n = system.otile_col*tc.num_groups if tc.num_groups<=2 else int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
-system.m = system.otile_row if tc.num_groups<=2 else int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col)) #total over pe groups
+system.otile_col = tc.num_pes * (tc.num_acc_tiles if tc.num_acc_tiles else 1)
+
+# Need a better way to divide the groups (especially with more accumualtion tiles)
+# define a way to partition to n and m
+
+# m * n = num_groups * otile_col * otile_row
+# m = a * otile_row
+# n = b * otile_col
+# a & b > 1
+# a*b = num_groups
+
+# get common factors of num_groups (pick a and b factors such that they're closest to a * otile_row/otile_col == b)
+def find_divisor_pairs(n):
+    divisor_pairs = []
+    # Iterate up to the square root of n
+    for i in range(1, int(n**0.5) + 1):
+        if n % i == 0:  # If i is a divisor
+            divisor_pairs.append((i, n // i))
+            # Add both (i, n // i) and (n // i, i) if they are different
+            if i != n // i:
+                divisor_pairs.append((n // i, i))
+    return divisor_pairs
+
+pairs = find_divisor_pairs(tc.num_groups)
+a,b = min(pairs, key=lambda pair: abs(pair[0]*system.otile_row/system.otile_col - pair[1]))
+print("A: ", a)
+print("B: ", b) ;
+
+
+#system.n = system.otile_col*tc.num_groups if tc.num_groups<=2 else b * system.otile_col#int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
+#system.m = system.otile_row if tc.num_groups<=2 else a * system.otile_row #system.n #total over pe groups
+system.n = b * system.otile_col#int(math.sqrt(tc.num_groups * system.otile_row * system.otile_col))
+system.m = a * system.otile_row #system.n #total over pe groups
 system.k = tc.operand_count # TileSizeRow
 print("TC")
 print (tc)

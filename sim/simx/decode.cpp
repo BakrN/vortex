@@ -46,7 +46,8 @@ static const std::unordered_map<Opcode, InstType> sc_instTable = {
   {Opcode::EXT2,       InstType::R4_TYPE},
   {Opcode::R_INST_W,   InstType::R_TYPE},
   {Opcode::I_INST_W,   InstType::I_TYPE},
-  {Opcode::MMA,      InstType::R4_TYPE},
+  {Opcode::MMA,        InstType::R4_TYPE},
+  {Opcode::TC_FLUSH,   InstType::I_TYPE},
 };
 
 enum Constants {
@@ -388,6 +389,7 @@ static const char* op_string(const Instr &instr) {
   case Opcode::FMNMSUB: return func2 ? "FNMSUB.D" : "FNMSUB.S";
   case Opcode::VSET:    return "VSET";
   case Opcode::MMA:     return "MMA";
+  case Opcode::TC_FLUSH: return "TC_FLUSH";
   case Opcode::EXT1:
     switch (func7) {
     case 0:
@@ -564,8 +566,13 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
     break;
 
   case InstType::I_TYPE: {
-    instr->addSrcReg(rs1, RegType::Integer);
-    if (op == Opcode::FL) {
+    if (op == Opcode::TC_FLUSH) {
+        instr->addSrcReg(rs1, RegType::TC);
+        std::cout << " TC Flush instruction to reg " << rd << std::endl;
+    } else {
+        instr->addSrcReg(rs1, RegType::Integer);
+    }
+    if (op == Opcode::FL || op == Opcode::TC_FLUSH) {
       instr->setDestReg(rd, RegType::Float);
     } else {
       instr->setDestReg(rd, RegType::Integer);

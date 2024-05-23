@@ -18,6 +18,9 @@ struct MATMetadata {
     uint16_t warp_id;
     uint16_t rd;
     std::bitset<MAX_NUM_THREADS> tmask;
+
+    bool flush = false;
+    uint32_t flush_tile= 0;
 };
 
 
@@ -200,35 +203,65 @@ template <typename T = uint32_t>
 class AccBuffer { // Accumulator buffer
     public:
         AccBuffer() {}
-        AccBuffer(size_t num_cols ,
+        AccBuffer(size_t col_width,
+                  size_t num_cols ,
                   size_t num_tiles
-                  ) : m_num_cols(num_cols), m_num_tiles(num_tiles), m_head(0), m_tail(0) {
+                  ) : m_col_width(col_width), m_num_cols(num_cols), m_num_tiles(num_tiles), m_locked(0){
+
+            m_locked.resize(num_tiles, 0);
             m_data.resize(num_tiles);
+            m_head.resize(num_tiles);
+            m_tail.resize(num_tiles);
             for (size_t i = 0 ; i < num_tiles; i++){
-                m_data[i].resize(num_cols,0);
+                m_data[i].resize(num_cols);
+                m_head[i].resize(num_cols,0);
+                m_tail[i].resize(num_cols,0);
+                for (size_t j = 0 ; j < num_cols; j++) {
+                    m_data[i][j].resize(col_width, 0);
+                }
             }
         }
 
         ~AccBuffer() {
         }
 
-        T read(size_t tile=0) {
-            return m_data[tile][m_tail];
-            m_tail += 1;
+        T read(size_t col, size_t tile=0) { // used for accumulation
+            T res = m_data[tile][col][m_tail[tile][col]];
+            m_tail[tile][col] = (m_tail[tile][col]+1) % m_col_width;
+            return res;
         }
 
-        void insert(T value, size_t tile=0) {
-            m_data[tile][m_head] = value;
-            m_head = (m_head+1) % m_num_cols;
+        T readShifted(size_t col , size_t tile=0) {  // for output
+            size_t shift =((m_tail[tile][col] - col)%m_col_width) ;
+            T res = m_data[tile][col][((m_tail[tile][col] - col)%m_col_width) ];
+            m_tail[tile][col] = (m_tail[tile][col]+1) % m_col_width;
+            return res;
+        }
+
+        void insert(T value, size_t col, size_t tile=0) {
+            m_data[tile][col][m_head[tile][col]] = value;
+            m_head[tile][col] = (m_head[tile][col]+1) % m_col_width;
+            if (m_locked[tile] && col==0) {
+                m_locked[tile] -=1 ;
+            }
+        }
+
+        bool isLocked(int tile) {
+            return m_locked[tile]!=0;
+        }
+
+        void lock(int tile){
+            m_locked[tile] = m_col_width;
         }
 
     private:
-        std::vector<std::vector<T>> m_data;
-        size_t m_head;
-        size_t m_tail;
+        std::vector<std::vector<std::vector<T>>> m_data;
+        std::vector<std::vector<size_t>> m_head;
+        std::vector<std::vector<size_t>> m_tail;
         size_t m_num_cols;
+        size_t m_col_width;
         size_t m_num_tiles;
-
+        std::vector<int> m_locked; // locks tile , unlocks on 0 col
 };
 
 
@@ -248,7 +281,7 @@ class TCOutputFifo {  // per pe
                 m_meta.emplace(std::vector<MATMetadata>());
                 m_meta.back().emplace_back(value.first) ;
 
-                m_shifted.push(false) ;
+                m_shifted.push(shared_pes==1);
             } else {
                 m_data.back().emplace_back(value.second) ;
                 m_meta.back().emplace_back(value.first) ;

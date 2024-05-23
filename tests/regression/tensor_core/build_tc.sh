@@ -10,11 +10,11 @@ tc_defines=`cat defines.txt`
 cd ..
 
 #cd ../../../
-#cd runtime/simx
-#make clean
+##cd runtime/simx
+##make clean
+##
+##make EXTFLAGS+="${tc_defines}" 
 #
-#make EXTFLAGS+="${tc_defines}" 
-
 cd $cur
 
 make clean-all

@@ -5,6 +5,30 @@
 #include <vx_print.h>
 
 
+template<int KK, int COL, int NUM_COLS, int K,  typename T>
+inline constexpr void unrolled_load_col_row_major(T* row_ptr, T* registers,  int ROW_STRIDE) {
+    if constexpr (COL < NUM_COLS) {
+        if constexpr (KK < K) {
+            registers[COL*K + KK] = *(row_ptr+KK + COL*ROW_STRIDE);
+            unrolled_load_col_row_major<KK + 1, COL, NUM_COLS ,K, T>(row_ptr, registers,ROW_STRIDE);
+        } else {
+            unrolled_load_col_row_major<0, COL + 1, NUM_COLS ,K, T>(row_ptr, registers, ROW_STRIDE);
+        }
+    }
+}
+
+template<int KK, int COL, int NUM_COLS, int K,  typename T>
+inline constexpr void unrolled_load_col_col_major(T* col_ptr, T* registers,  int COL_STRIDE) {
+    if constexpr (COL < NUM_COLS) {
+        if constexpr (KK < K) {
+            registers[COL*K + KK] = *(col_ptr+COL + KK*COL_STRIDE);
+            unrolled_load_col_row_major<KK+ 1, COL, NUM_COLS ,K, T>(col_ptr, registers,COL_STRIDE);
+        } else {
+            unrolled_load_col_row_major<0, COL + 1, NUM_COLS ,K, T>(col_ptr, registers, COL_STRIDE);
+        }
+    }
+}
+
 template<int I, int J, int TILE_COLS, int TILE_ROWS,  typename T>
 inline constexpr void unrolled_load_row_row_major(T* row_ptr, T* registers,  int ROW_STRIDE) {
     if constexpr (I < TILE_ROWS) {
@@ -16,33 +40,6 @@ inline constexpr void unrolled_load_row_row_major(T* row_ptr, T* registers,  int
         }
     }
 }
-
-template<int I, int J, int TILE_COLS, int TILE_ROWS,  typename T>
-inline constexpr void unrolled_load_col_row_major(T* row_ptr, T* registers,  int ROW_STRIDE) {
-    if constexpr (I < TILE_ROWS) {
-        if constexpr (J < TILE_COLS) {
-            registers[I * TILE_COLS + J] = *(row_ptr + J*ROW_STRIDE);
-            unrolled_load_col_row_major<I, J + 1, TILE_COLS,TILE_ROWS, T>(row_ptr, registers, ROW_STRIDE);
-        } else {
-            unrolled_load_col_row_major<I + 1, 0, TILE_COLS,TILE_ROWS, T>(row_ptr+1, registers,ROW_STRIDE);
-        }
-    }
-}
-
-/// LOAD COLUMN FROM COLUMN MAJOR PTR (+1 new row+same column)
-//TODO
-template<int I, int J, int TILE_COLS, int TILE_ROWS,  typename T>
-inline constexpr void unrolled_load_col_col_major(T* col_ptr, T* registers,  int COL_STRIDE) {
-    if constexpr (I < TILE_ROWS) {
-        if constexpr (J < TILE_COLS) {
-            registers[I * TILE_COLS + J] = *(col_ptr + I);
-            unrolled_load_col_col_major<I+1, J , TILE_COLS,TILE_ROWS, T>( col_ptr, registers,COL_STRIDE);
-        } else {
-            unrolled_load_col_col_major<0, J+1, TILE_COLS,TILE_ROWS, T>(col_ptr + COL_STRIDE,registers, COL_STRIDE);
-        }
-    }
-}
-
 
 //TODO
 template<int I, int J, int TILE_COLS, int TILE_ROWS,  typename T>
@@ -228,8 +225,9 @@ inline void tc_load_fragment_a(T* ptr, T* reg , const int thread_id, const int M
 
 template <typename T, int OP_size, int Res_size,
     int TC_N, int PE_K,
-    int TILE_ROWS , int TILE_COLS,  // output tile partitioning
+    int TILE_COLS,  // output tile partitioning
     int NUM_PE_PER_GROUP,    // let's assume I know my thread_id beforehand
+    int NUM_COLS=1,
     layout_t layout = layout_t::COL_MAJOR
 >
 inline void tc_load_fragment_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, const int MAT_K) {
@@ -239,16 +237,16 @@ inline void tc_load_fragment_b(T* ptr, T* reg , const int thread_id,  const int 
 
     if constexpr (layout == layout_t::ROW_MAJOR)  {
         //vx_printf("(%d) B(rm) col= %d\n", thread_id,  (col_group * TILE_COLS + thread_id % TILE_COLS));
-        auto col_offset = (col_group * TILE_COLS) + thread_id % TILE_COLS;
+        auto col_offset = (col_group * TILE_COLS) + thread_id*NUM_COLS % TILE_COLS;
         T* b_col_ptr = ptr + col_offset/(Res_size/OP_size);
         const int row_stride = MAT_N * OP_size/Res_size;
-        unrolled_load_col_row_major<0, 0, 1,PE_K/(Res_size/OP_size), T>(b_col_ptr, reg, row_stride);
+        unrolled_load_col_row_major<0, 0, NUM_COLS,PE_K/(Res_size/OP_size), T>(b_col_ptr, reg, row_stride);
     } else {
         //vx_printf("(%d) B(cm) col= %d\n", thread_id,  (col_group * TILE_COLS + thread_id % TILE_COLS));
-        auto col_offset = MAT_K*(col_group * TILE_COLS + thread_id % TILE_COLS); // b col stride
+        auto col_offset = MAT_K*(col_group * TILE_COLS + thread_id*NUM_COLS % TILE_COLS); // b col stride
         T* b_col_ptr = ptr + col_offset/(Res_size/OP_size);
         const int col_stride = MAT_K * OP_size/Res_size;
-        unrolled_load_col_col_major<0, 0, 1,PE_K/(Res_size/OP_size), T>(b_col_ptr, reg, col_stride);
+        unrolled_load_col_col_major<0, 0, NUM_COLS,PE_K/(Res_size/OP_size), T>(b_col_ptr, reg, col_stride);
     }
 }
 

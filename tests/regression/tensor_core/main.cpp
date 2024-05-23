@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vortex.h>
+#include "VX_config.h"
 #include "common.h"
 #include "helper.hpp"
 
@@ -116,8 +117,14 @@ int main(){
     kernel_args.K_ = MM_K;
 
 
-    kernel_args.num_tasks = NUM_CORES* NUM_THREADS * NUM_WARPS; // how many threads warps etc... warps / cores to launch
-    std::cout << "NUM CORES: " << NUM_CORES << " NUM WARPS: " << NUM_WARPS << " NUM THREADS: " << NUM_THREADS << std::endl;
+    int num_cores ;
+    int num_warps;
+    int num_threads;
+    vx_dev_caps(device, VX_CAPS_NUM_CORES, reinterpret_cast<uint64_t*>(&num_cores));
+    vx_dev_caps(device, VX_CAPS_NUM_WARPS, reinterpret_cast<uint64_t*>(&num_warps));
+    vx_dev_caps(device, VX_CAPS_NUM_THREADS, reinterpret_cast<uint64_t*>(&num_threads));
+    kernel_args.num_tasks = NUM_CORES * NUM_WARPS * NUM_THREADS; // how many threads warps etc... warps / cores to launch
+    std::cout << "NUM CORES: " << num_cores << " NUM WARPS: " << num_warps << " NUM THREADS: " << num_threads <<  "NUM TASKS: " << kernel_args.num_tasks << std::endl;
 
     // copy operand data to device
     vx_copy_to_dev(device, A_ADDR, A, A_bytes);
@@ -151,13 +158,13 @@ int main(){
         std::cout << std::endl;
     }
 
-    //for (int i = 0 ; i < MM_M; i ++) {
-    //    for (int j = 0 ; j < MM_N; j++) {
-    //        if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j])) {
-    //            std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
-    //        }
-    //    }
-    //}
+    for (int i = 0 ; i < MM_M; i ++) {
+        for (int j = 0 ; j < MM_N; j++) {
+            if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j], 0.1f)) {
+                std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
+            }
+        }
+    }
 
 
     free(A);

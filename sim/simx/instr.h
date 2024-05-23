@@ -47,7 +47,9 @@ enum Opcode {
   // Vector Extension
   VSET      = 0x57,
   // TC Extension
-  MMA     = 0x7b,
+  MMA       = 0x7b,
+  TC_FLUSH  = 0x7c,
+  // Accelerator interface
   // Custom Extensions
   EXT1      = 0x0b,
   EXT2      = 0x2b,

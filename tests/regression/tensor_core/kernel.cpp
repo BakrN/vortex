@@ -22,9 +22,11 @@
 
 
 
+#if (TC_NUM_ACC_TILES > 0)
+#define TILE_ACC_STRATEGY
+#endif
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
-
 
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
@@ -41,18 +43,23 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    // 2D Block output tile partitiong (possible to do k opt)
    // Possible to assign X tasks per tile and reduce
 
-   uint64_t log2_num_tasks = (kernel_arg->num_tasks/NUM_THREADS >1 ? kernel_arg->num_tasks/NUM_THREADS >> 1 : 1);
+   uint32_t log2_num_tasks = (kernel_arg->num_tasks/NUM_THREADS >1 ? kernel_arg->num_tasks/NUM_THREADS >> 1 : 1);
 
-   uint64_t tileSizeX = MAT_N/log2_num_tasks;
-   uint64_t tileSizeY = MAT_M/log2_num_tasks;
+   uint32_t tileSizeX = MAT_N/log2_num_tasks;
+   uint32_t tileSizeY = MAT_M/log2_num_tasks;
 
-   uint64_t num_blocksX = MAT_N/tileSizeX;
-   uint64_t num_blocksY = MAT_M/tileSizeY;
+   if (kernel_arg->num_tasks/NUM_THREADS ==2) {
+       tileSizeX = tileSizeX/2;
+   }
 
-   uint64_t blockX  = (task_id/NUM_THREADS) % num_blocksX;
-   uint64_t blockY  = (task_id/NUM_THREADS) / num_blocksY;
+   uint32_t num_blocksX = MAT_N/tileSizeX;
+   uint32_t num_blocksY = MAT_M/tileSizeY;
 
-   vx_printf("task_id: %d, blockX = %d, blockY = %d\n", task_id, blockX, blockY);
+
+   uint32_t blockX  = (task_id/NUM_THREADS) % num_blocksX;
+   uint32_t blockY  = (task_id/NUM_THREADS) / num_blocksY;
+
+   //vx_printf("task_id: %d, blockX = %d, blockY = %d\n", task_id, blockX, blockY);
 
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockY*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockX*MAT_K*PREC_RATIO; // assuming col major
@@ -72,20 +79,34 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float* D_ptr = D_start;
 
    float regA[tc_k * PREC_RATIO];
-   float regB[tc_k * PREC_RATIO];
+   float regB[tc_k * PREC_RATIO * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)];
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
+   float regD[OTILE_COL] = {0};
    // Main GEMM (simple 1 warp impl)
-   for (int i = 0 ; i < MAT_M; i+=tc_m) {
+   for (int i = 0 ; i < MAT_M; i+=tc_m*((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)) {
        C_ptr=C_start + MAT_N*i; // ROW MAJOR
        D_ptr=D_start + MAT_N*i; // ROW MAJOR
-       for (int j = 0; j < MAT_N ; j+=tc_n){
+       for (int j = 0; j < MAT_N ; j+=tc_n*((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)){
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
-           B_ptr=B_start+ MAT_K*j*PREC_RATIO;  // COL MAJOR
+           B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
            tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
+           #ifdef TILE_ACC_STRATEGY
+           tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
+           tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
+
+           tc_mma_acc_zero_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0);
+           A_ptr+=tc_k * PREC_RATIO; // assuming row major
+           B_ptr+=tc_k * PREC_RATIO; // assumming col_major
+
+           for (int k = tc_k ; k < MAT_K; k+=tc_k){
+           #else
            for (int k = 0 ; k < MAT_K; k+=tc_k){
+           #endif
+
                tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
-               tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(B_ptr, regB, thread_id, MAT_N, MAT_K);
+
+               tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
                #ifdef DEBUG
 
@@ -115,7 +136,14 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                #endif
 
 
-               tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,true>((float*)regA, (float*)regB, (float*)regC);
+               #ifdef TILE_ACC_STRATEGY
+                   // acc tile (unroll for N times acc tiles)
+                   // repeat this NUM Tile times
+                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0) ;
+               #else
+                   tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,true>((float*)regA, (float*)regB, (float*)regC);
+               #endif
+
 
 
                //#ifdef DEBUG
@@ -127,15 +155,26 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                //#endif
 
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
-               B_ptr+=tc_k * PREC_RATIO; // assumiming col_major
+               B_ptr+=tc_k * PREC_RATIO; // assumming col_major
            }
-           C_ptr=C_ptr + tc_n ; // ROW MAJOR
+           #ifdef TILE_ACC_STRATEGY
+           // flush tc results for each used tiles
+           // Do (initial C) accumulation
+           tc_flush_tiles<float, OTILE_COL, TC_NUM_ACC_TILES> ((float*)(regD)) ;
 
-           // Storage strategy can change here
+           for (int i = 0 ; i < OTILE_COL; i++) {
+               regD[i] = regD[i] + regC[i];
+           }
+           // store
+           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regD, (float*)D_ptr, thread_id, MAT_N);
+           #else
            tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regC, (float*)D_ptr, thread_id, MAT_N);
-           D_ptr=D_ptr + tc_n ; // ROW MAJOR
+           #endif
+           C_ptr=C_ptr + tc_n * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) ; // ROW MAJOR
+           D_ptr=D_ptr + tc_n * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1); // ROW MAJOR
        }
    }
+   // Accumulation of first C here
 }
 
 
