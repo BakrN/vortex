@@ -28,7 +28,7 @@ ifdef DEBUG
 	CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG)
 	#CXXFLAGS += -g -O0 -DDEBUG_LEVEL=$(DEBUG) -fsanitize=address -fno-omit-frame-pointer
 else
-	CXXFLAGS +=  -g -DNDEBUG #-O2 -DNDEBUG
+	CXXFLAGS +=  -O2 -DNDEBUG
 endif
 
 PROJECT = simx

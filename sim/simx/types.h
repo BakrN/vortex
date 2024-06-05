@@ -83,6 +83,7 @@ enum class TCOpType :uint32_t { // BAKR NOTE: more types later ( should be tied 
     ACC_BUF,
     ACC_IMM,
     NO_ACC,
+    ACC_SINK,
     FLUSH
 
 };

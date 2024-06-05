@@ -749,7 +749,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
             std::cout << "tc buf " << rd ;
         }
         std::cout << " acc_source: ";
-        if (func2 == 0) {
+        if (func2 == 0) { // let's say none is 0 or whatever ...
             std::cout << "none " ;
             // no accumulation source
         } else if (func2 ==1) {

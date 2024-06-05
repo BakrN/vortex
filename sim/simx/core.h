@@ -39,6 +39,8 @@
 #include "dcrs.h"
 
 class TensorCore;
+class FuncTensorCore;
+
 namespace vortex {
 
 class Cluster;
@@ -171,6 +173,7 @@ private:
   std::vector<Operand::Ptr> operands_;
   std::vector<Dispatcher::Ptr> dispatchers_;
   std::vector<ExeUnit::Ptr> exe_units_;
+  std::unique_ptr<FuncTensorCore> func_tensor_core_;
   SharedMem::Ptr sharedmem_;
 
   PipelineLatch fetch_latch_;

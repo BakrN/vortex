@@ -138,7 +138,12 @@ class PEGroup {
 
 };
 
-class TensorCore : public vortex::ExeUnit{
+enum class SimMode {
+    REG_WB,
+    NONE_WB
+};
+
+class TensorCore {
     public :
         struct Config_t {
             // Core parameters
@@ -150,7 +155,6 @@ class TensorCore : public vortex::ExeUnit{
             size_t input_mat_buf_depth;
             size_t output_fifo_size;
             size_t num_acc_tiles;
-            // UNUSED FOR NOW
             size_t num_dot_units=1;
 
             void print(){
@@ -165,27 +169,45 @@ class TensorCore : public vortex::ExeUnit{
                 std::cout << "num_dot_units: " << num_dot_units<< std::endl;
             }
         };
-        TensorCore(const SimContext& ctx, vortex::Core*, Config_t config);
-        void tick();
-        bool isBusy() ;
+        TensorCore(vortex::Core*, Config_t config);
 
-    private:
+    protected:
+        uint64_t m_cycle = 0;
         // Ticks functions
-        void handleInput();
-        void compute(); // queue output stuff after N cycles
-        void queueWriteback();
-        void drainOutQueue();
+        template <bool FUNC_ONLY>
+        bool handleInput(vortex::pipeline_trace_t* trace); // accepted
+        template <bool FUNC_ONLY>
+        bool compute(); // queue output stuff after N cycles
+        template <bool FUNC_ONLY>
+        vortex::pipeline_trace_t* queueWriteback(); // return <wis, trace> (in case of tile wb)
+        template <bool FUNC_ONLY>
+        vortex::pipeline_trace_t* drainOutQueue();  // return <wid, trace>
+
         vortex::pipeline_trace_t* createInternalTrace(const MATMetadata&);
-
-
+        vortex::Core* m_core;
         Config_t m_config;
         std::vector<PEGroup> m_pe_groups;
         std::queue<std::pair<uint64_t, std::tuple<MATMetadata, uint32_t, std::pair<uint32_t, uint32_t>>>> m_timing; // cycles to wait , (meta, result, (grp,pe))
 
-        uint64_t m_cycle = 0;
-
         uint64_t m_stat_out_traces = 0;
 
+};
+
+class FuncTensorCore : public TensorCore { // writes back to register file (Unused in cluster level GEMMs)
+    public:
+        FuncTensorCore(vortex::Core*, Config_t config);
+        ~FuncTensorCore();
+        void execute(vortex::pipeline_trace_t* trace);
+};
+
+class TimingTensorCore : public TensorCore, public vortex::ExeUnit { // Basically doesn't write back to reg file (but only used to simulate timing) But used functionally as well in cluster-level GEMMs
+    public:
+        TimingTensorCore(const SimContext& ctx, vortex::Core*, Config_t config);
+        ~TimingTensorCore();
+        bool isBusy();
+        void tick () ;
+    private:
+        // Operations for System wide GEMM ( I have to check L2 cache misses etc... (how much I save))
 };
 
 #endif

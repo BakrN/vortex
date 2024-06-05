@@ -94,8 +94,8 @@ Core::Core(const SimContext& ctx,
   tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
 
   tc_operand_count = tc_config.operand_count;
-  exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TensorCore>(this, tc_config);
-
+  exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TimingTensorCore>(this, tc_config);
+  func_tensor_core_ = std::make_unique<FuncTensorCore>(this, tc_config);
   this->reset();
 }
 
@@ -260,11 +260,8 @@ void Core::issue() {
     if (operand->Output.empty())
       continue;
     auto trace = operand->Output.front();
+
     if (dispatchers_.at((int)trace->exe_type)->push(i, trace)) {
-      if(trace->exe_type == ExeType::TC && !trace->wb && trace->eop){
-          // .. dispatched here
-          //++committed_instrs_;
-      }
       operand->Output.pop();
       trace->log_once(false);
     } else {
@@ -708,7 +705,7 @@ bool Core::check_exit(Word* exitcode, bool riscv_test) const {
 
 bool Core::running() const {
   auto& exe_unit= (exe_units_[(int)ExeType::TC]);
-  auto& tc = static_cast<TensorCore&>(*exe_unit);
+  auto& tc = static_cast<TimingTensorCore&>(*exe_unit);
   auto& dispatch = dispatchers_[(int)ExeType::TC];
   //std::cout << "committed_instrs_ " << committed_instrs_ << " issued_instrs_ " << issued_instrs_ << " tc.isBusy() " << tc.isBusy() << " dispatch->processing() " << dispatch->processing() << std::endl;
   return (committed_instrs_ != issued_instrs_) || tc.isBusy() || dispatch->processing();

@@ -5,7 +5,10 @@
 #include "tc_helper.h"
 #include "types.h"
 #include <cstring>
-
+inline uint64_t nan_box(uint32_t value) {
+  uint64_t mask = 0xffffffff00000000;
+  return value | mask;
+}
 
 PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t output_fifo_size, size_t num_acc_tiles)  :
     m_num_pes(num_pes)
@@ -43,7 +46,7 @@ PEGroup::~PEGroup() {
 
 }
 
-TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t config) : vortex::ExeUnit(ctx,core,  "TensorCore"),  m_config(config) {
+TensorCore::TensorCore(vortex::Core* core, Config_t config) :   m_core(core), m_config(config) {
     m_config.print();
     // initialize the PE Groups
     for (size_t i = 0; i < config.num_pe_groups; i++) {
@@ -52,28 +55,11 @@ TensorCore::TensorCore(const SimContext& ctx, vortex::Core* core, Config_t confi
     }
 }
 
-bool TensorCore::isBusy() {
-    bool busy = false;
-    for (int i = 0 ; i < ISSUE_WIDTH; i++) {
-        busy |= !Inputs.at(i).empty();
-        busy |= !Outputs.at(i).empty();
-    }
-    // all other queues in here are empty
-    busy |= !m_timing.empty();
 
-    // only need to check 1 pe group
-    for (int i = 0 ; i < MAX_NUM_WARPS;i++)
-        busy |= !m_pe_groups[0].mata(i).isNonAllocated();
-    busy |= !m_pe_groups[0].getOutputFIFO(0).empty();
-
-    // Print all conditions here:
-
-    return busy;
-}
 
 vortex::pipeline_trace_t* TensorCore::createInternalTrace(const MATMetadata& meta){
     uint32_t tag = (meta.rd << 16) | (meta.warp_id << 4) | (int)vortex::RegType::Float;
-    vortex::pipeline_trace_t* trace = new vortex::pipeline_trace_t(tag , core_->arch());
+    vortex::pipeline_trace_t* trace = new vortex::pipeline_trace_t(tag , m_core->arch());
     trace->eop = true;// If i'm creating an internal trace then I'm sure I'm writing back
     trace->wb = true;
     trace->wid = meta.warp_id;
@@ -84,179 +70,173 @@ vortex::pipeline_trace_t* TensorCore::createInternalTrace(const MATMetadata& met
     return trace;
 }
 
-void TensorCore::handleInput(){
-    for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
-        // Handle inputs
-        auto& input= Inputs.at(i) ;
-        if (input.empty()) {
-            continue;
+template <bool FUNC_ONLY>
+bool TensorCore::handleInput(vortex::pipeline_trace_t* trace){
+
+    static int count = 0;
+
+    // Load Inputs (assumption parallel loading)
+    auto wid = trace->wid;
+    auto& warp = m_core->warps_[trace->wid]; // can't handle multiple independent data streams for now (per row in matrix buffers can add warp tag) (also independent matrix tile buffers)
+                                             // check for space and allocate meta data
+    for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) { // only need to check grp 0 basically... (but leave this flexibility for future)
+        if (!m_pe_groups[grp].spaceToAccept(trace)) {
+            return false;
+
         }
+    }
 
-        vortex::pipeline_trace_t* trace = input.front();
+    // check if tile is locked (if it is then don't accept warp) (acc source)
+    if (trace->tc_type == vortex::TCOpType::ACC_BUF && m_pe_groups[0].tileAccumulator(trace->wid).isLocked(trace->rsrc3)) {
+        return false;
+    }
+
+    std:: cout << "Accepted input(" << count++ << "): " << *trace << std::endl;
+    if (trace->tc_type == vortex::TCOpType::FLUSH) {
+        // m_timing
+        std::cout << "Flush instruction " << std::endl;
+        MATMetadata meta;
+        meta.flush = true;
+        meta.wb = true;
+        meta.warp_id = wid;
+        meta.rd = trace->rdest;
+        meta.tmask = trace->tmask;
+        meta.flush_tile = trace->rsrc1;
 
 
-        static int count = 0;
-
-        // Load Inputs (assumption parallel loading)
-        auto wid = trace->wid;
-        auto& warp = core_->warps_[trace->wid]; // can't handle multiple independent data streams for now (per row in matrix buffers can add warp tag) (also independent matrix tile buffers)
-        // check for space and allocate meta data
-        bool accept_warp = true;
-        for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
-            if (!m_pe_groups[grp].spaceToAccept(trace)) {
-                accept_warp = false;
-                break;
-            }
+        for (size_t grp=0; grp < m_config.num_pe_groups; grp++) {
+            //for (size_t i= 0 ; i< m_config.num_pes; i++) {
+            m_pe_groups[grp].addMeta(meta, wid);
+            //}
         }
-        if (accept_warp) {
-            // check if tile is locked (if it is then don't accept warp) (acc source)
-            if (trace->tc_type == vortex::TCOpType::ACC_BUF && m_pe_groups[0].tileAccumulator(trace->wid).isLocked(trace->rsrc3)) {
-                break;
-            }
+        return true; // no need to go further in loop
+    } else {
 
-            std:: cout << "Accepted input(" << count++ << "): " << *trace << std::endl;
-            input.pop();
-            if (trace->tc_type == vortex::TCOpType::FLUSH) {
-                // m_timing
-                std::cout << "Flush instruction " << std::endl;
+        if (trace->rdest_type != vortex::RegType::None) { // Done only once
+            for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
                 MATMetadata meta;
-                meta.flush = true;
-                meta.wb = true;
+                meta.wb = trace->wb ; // reg wb
                 meta.warp_id = wid;
                 meta.rd = trace->rdest;
                 meta.tmask = trace->tmask;
-                meta.flush_tile = trace->rsrc1;
-
-
-                for (size_t grp=0; grp < m_config.num_pe_groups; grp++) {
-                    //for (size_t i= 0 ; i< m_config.num_pes; i++) {
-                    m_pe_groups[grp].addMeta(meta, wid);
-                    //}
-                }
-                break; // no need to go further in loop
-            } else {
-
-                if (trace->rdest_type != vortex::RegType::None) { // Done only once
-                    for (size_t grp = 0 ; grp < m_config.num_pe_groups; grp++) {
-                        MATMetadata meta;
-                        meta.wb = trace->wb ; // reg wb
-                        meta.warp_id = wid;
-                        meta.rd = trace->rdest;
-                        meta.tmask = trace->tmask;
-                        meta.flush = false;
-                        std::cout << "meta rd: " << meta.rd << std::endl;
-                        if (!trace->wb) {
-                            m_pe_groups[grp].tileAccumulator(trace->wid).lock(trace->rdest);
-                            // Assumption: the wb to buffer instruction is only used once at the very last load into tc core. So I fill out the metas for consistency with the same write back to same tile
-                            for (size_t i= 0 ; i< m_config.num_pes; i++) {
-                                m_pe_groups[grp].addMeta(meta, wid);
-                                //if (i >0 && grp==0 && trace->eop) {
-                                //    core_->committed_instrs_++;
-                                //}
-                            }
-                        } else {
-                            m_pe_groups[grp].addMeta(meta, wid);
-                        }
+                meta.flush = false;
+                std::cout << "meta rd: " << meta.rd << std::endl;
+                if (!trace->wb) {
+                    m_pe_groups[grp].tileAccumulator(trace->wid).lock(trace->rdest);
+                    // Assumption: the wb to buffer instruction is only used once at the very last load into tc core. So I fill out the metas for consistency with the same write back to same tile
+                    for (size_t i= 0 ; i< m_config.num_pes; i++) {
+                        m_pe_groups[grp].addMeta(meta, wid);
+                        //if (i >0 && grp==0 && trace->eop) {
+                        //    m_core->committed_instrs_++;
+                        //}
                     }
-                }
-                if (trace->eop) {
-                    core_->committed_instrs_++;
+                } else {
+                    m_pe_groups[grp].addMeta(meta, wid);
                 }
             }
-        } else {
-            break;
+        }
+        if constexpr (!FUNC_ONLY) {
+            if (trace->eop) {
+                m_core->committed_instrs_++;
+            }
+        }
+    }
+    for (size_t t = 0 ; t < MAX_NUM_THREADS; t++) {
+        if (!trace->tmask.test(t)) {
+            continue;
+        }
+        auto grp = t/m_config.num_pes % m_pe_groups.size();
+        auto& pe_grp = m_pe_groups[grp];
+
+        std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
+        std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
+        uint32_t c =0;
+
+        // find first N(=2) operands of A and B and possible c depending on type
+
+        uint32_t a_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc1];
+        uint32_t b_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc2];
+
+        A.second= (a_val & 0xFFFF0000) >> 16;
+        A.first = a_val & 0xFFFF ;
+
+        float16 first(A.first) ;
+        float16 second(A.second);
+        std::cout << "Received A: " <<
+            first.to_float32() << " " ;
+        std::cout << second.to_float32();
+
+
+        B.second = (b_val & 0xFFFF0000) >> 16;
+        B.first = b_val & 0xFFFF ;
+
+        first  = float16(B.first) ;
+        second = float16(B.second);
+        std::cout << "Received B: " <<
+            first.to_float32() << " " ;
+        std::cout << second.to_float32();
+
+
+
+        if (pe_grp.mata(wid).isBackFull()  || pe_grp.mata(wid).isNonAllocated()){ // and can I add it
+            MATMetadata meta;
+            meta.wb = trace->wb;
+            meta.warp_id = trace->wid;
+            meta.rd = trace->rdest;
+            std::cout << "A alloc Back full: " << pe_grp.mata(wid).isBackFull() << " Full: " << pe_grp.mata(wid).isFull() << " Empty: " << pe_grp.mata(wid).isNonAllocated() << std::endl;
+            pe_grp.allocateRow( wid );
         }
 
-        for (size_t t = 0 ; t < MAX_NUM_THREADS; t++) {
-            if (!trace->tmask.test(t)) {
-                continue;
+        auto pe = t % m_config.num_pes;
+
+
+
+
+        pe_grp.mata(wid).insert(A.first, pe );
+        pe_grp.mata(wid).insert(A.second,pe );
+
+        pe_grp.matb(wid).insert(B.first, pe);
+        pe_grp.matb(wid).insert(B.second, pe);
+
+        if (trace->tc_type == vortex::TCOpType::ACC_REG) {
+            // assert back is not full
+            assert(!pe_grp.matc(wid).isBackFull()) ;
+            c = warp->freg_file_.at(t)[trace->rsrc3];
+            pe_grp.matc(wid).insert(c,pe);
+        }
+        else if(trace->tc_type == vortex::TCOpType::ACC_BUF) { // Only mention this once
+                                                               // fetch from mat tile accumulator
+                                                               // (might need to stall if prev instruction not yet done...)
+            assert(!pe_grp.matc(wid).isBackEmpty()); // assertion here that back is empty
+            auto tile = trace->rsrc3;
+            for (size_t col = 0;  col < m_config.num_pes; col++){
+                c = m_pe_groups[grp].tileAccumulator(wid).readShifted(pe, tile);
+                pe_grp.matc(wid).insert(c, pe);
             }
-            auto grp = t/m_config.num_pes % m_pe_groups.size();
-            auto& pe_grp = m_pe_groups[grp];
+        } else if (trace->tc_type == vortex::TCOpType::ACC_IMM) {
+            pe_grp.matc(wid).zeroBackRow(); // should actually add option to fill here
+        }
 
-            std::pair<uint16_t, uint16_t> A;  // can only load 2 operands of A at a time
-            std::pair<uint16_t, uint16_t> B;  // can only load 2 operands of B at a time
-            uint32_t c =0;
-
-            // find first N(=2) operands of A and B and possible c depending on type
-
-            uint32_t a_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc1];
-            uint32_t b_val = (uint32_t)warp->freg_file_.at(t)[trace->rsrc2];
-
-            A.second= (a_val & 0xFFFF0000) >> 16;
-            A.first = a_val & 0xFFFF ;
-
-            float16 first(A.first) ;
-            float16 second(A.second);
-            std::cout << "Received A: " <<
-            first.to_float32() << " " ;
-            std::cout << second.to_float32();
-
-
-            B.second = (b_val & 0xFFFF0000) >> 16;
-            B.first = b_val & 0xFFFF ;
-
-            first  = float16(B.first) ;
-            second = float16(B.second);
-            std::cout << "Received B: " <<
-            first.to_float32() << " " ;
-            std::cout << second.to_float32();
-
-
-
-            if (pe_grp.mata(wid).isBackFull()  || pe_grp.mata(wid).isNonAllocated()){ // and can I add it
-                MATMetadata meta;
-                meta.wb = trace->wb;
-                meta.warp_id = trace->wid;
-                meta.rd = trace->rdest;
-                std::cout << "A alloc Back full: " << pe_grp.mata(wid).isBackFull() << " Full: " << pe_grp.mata(wid).isFull() << " Empty: " << pe_grp.mata(wid).isNonAllocated() << std::endl;
-                pe_grp.allocateRow( wid );
-            }
-
-            auto pe = t % m_config.num_pes;
-
-
-
-
-            pe_grp.mata(wid).insert(A.first, pe );
-            pe_grp.mata(wid).insert(A.second,pe );
-
-            pe_grp.matb(wid).insert(B.first, pe);
-            pe_grp.matb(wid).insert(B.second, pe);
-
-            if (trace->tc_type == vortex::TCOpType::ACC_REG) {
-                // assert back is not full
-                assert(!pe_grp.matc(wid).isBackFull()) ;
-                c = warp->freg_file_.at(t)[trace->rsrc3];
-                pe_grp.matc(wid).insert(c,pe);
-            }
-            else if(trace->tc_type == vortex::TCOpType::ACC_BUF) { // Only mention this once
-                // fetch from mat tile accumulator
-                // (might need to stall if prev instruction not yet done...)
-                assert(!pe_grp.matc(wid).isBackEmpty()); // assertion here that back is empty
-                auto tile = trace->rsrc3;
-                for (size_t col = 0;  col < m_config.num_pes; col++){
-                    c = m_pe_groups[grp].tileAccumulator(wid).read(pe, tile);
-                    pe_grp.matc(wid).insert(c, pe);
-                }
-            } else if (trace->tc_type == vortex::TCOpType::ACC_IMM) {
-                pe_grp.matc(wid).zeroBackRow(); // should actually add option to fill here
-            }
-
-            // print t, pe , grp , warp_id
-            std::cout << "t: " << t << " pe: " << pe << " grp: " << grp << " warp_id: " << wid
+        // print t, pe , grp , warp_id
+        std::cout << "t: " << t << " pe: " << pe << " grp: " << grp << " warp_id: " << wid
             << " size(a): " <<  pe_grp.mata(wid).size(pe) <<  " size(b): " <<  pe_grp.matb(wid).size(pe)
             << " size(c): " <<  pe_grp.matc(wid).size(pe) <<  " tf(a): " << pe_grp.mata(wid).isFrontFull()
             <<  " tf(b): " << pe_grp.matb(wid).isFrontFull()  <<  " tf(c): " << pe_grp.matc(wid).isFrontFull()
             << " depth " << pe_grp.mata(wid).depth() << std::endl;
-        }
+    }
 
+    if constexpr (!FUNC_ONLY) {
         delete trace;
-        // accept
-        }
+    }
+    return true;
+    // accept
 }
 
-void TensorCore::compute(){
+/*
+ * Returns true if fired a computation
+ * */
+template <bool FUNC_ONLY>
+bool TensorCore::compute(){
     // queue up flush command (independent from comp)
     for (size_t wid = 0 ; wid < MAX_NUM_WARPS; wid++) {
         while (true) {
@@ -278,6 +258,7 @@ void TensorCore::compute(){
     }
     // select a warp to process
     size_t used_dot_units = 0;
+    bool computed = false;
     for(int wid = 0 ; wid < MAX_NUM_WARPS;wid++) { // priority based
         bool fired = false;
         for(size_t grp = 0 ; grp < m_pe_groups.size(); grp++) {
@@ -290,7 +271,7 @@ void TensorCore::compute(){
             // otherwise process new loaded row
             else if (m_pe_groups[grp].isReadyToFire(wid) ){
                 fired = true;
-                //core_->issued_ins
+                //m_core->issued_ins
                 std::cout << "Compute: ready to fire GRP: " << grp <<  std::endl;
                 MATMetadata meta = m_pe_groups[grp].frontMeta(wid);
                 if (meta.flush) {
@@ -327,15 +308,18 @@ void TensorCore::compute(){
             }
         }
         if (fired) {
+            computed = true;
             used_dot_units++;
         }
         if (used_dot_units == m_config.num_dot_units) {
             break;
         }
     }
+    return computed;
 }
 
-void TensorCore::queueWriteback(){
+template <bool FUNC_ONLY>
+vortex::pipeline_trace_t* TensorCore::queueWriteback(){
     while(!m_timing.empty()){
         auto& e = m_timing.front();
         auto& [meta, result, pe_id] = e.second;
@@ -349,20 +333,26 @@ void TensorCore::queueWriteback(){
                 // just queue directly to output. This might cause an inaccuracy but will not be too much. Maybe 1 cycle or so... (No backpressure on output port. Meaning I can accept other and start executing them. But most likely this wont change much of the perf. This just means (worst case scenario) an output fifo with size num_pes+input_mat_buf_depth))
 
                 // for all pes in grp
-                auto& warp = core_->warps_[meta.warp_id];
+                auto& warp = m_core->warps_[meta.warp_id];
                 for (size_t p = 0 ; p < m_config.num_pes; p++) {
                     uint32_t val  = m_pe_groups[grp].tileAccumulator(meta.warp_id).readShifted(p,meta.flush_tile);
-                    warp->freg_file_.at(p + grp*m_config.num_pes)[meta.rd] = val; // TODO: Changed later for partial thread exec
-                    float f_res = 0 ;
-                    float* ptr = reinterpret_cast<float*>(&val);
-                    std::memcpy(&f_res, ptr, sizeof(float));
-                    std::cout << "Wrote back to RG from Tile" << grp << " t: " << p + grp*m_config.num_pes << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
 
+                    if constexpr (FUNC_ONLY){
+                        warp->freg_file_.at(p + grp*m_config.num_pes)[meta.rd] = nan_box(val); // TODO: Changed later for partial thread exec
+                        float f_res = 0 ;
+                        float* ptr = reinterpret_cast<float*>(&val);
+                        std::memcpy(&f_res, ptr, sizeof(float));
+                        std::cout << "Wrote back to RG from Tile" << grp << " t: " << p + grp*m_config.num_pes << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
+                    }
                 }
-                if (grp == m_pe_groups.size()-1 ){  // only for last grp to avoid duplicates and free up scoreboard
-                    auto* trace = createInternalTrace(meta);
-                    std::cout << "Writeback TRACE: " << *trace << std::endl;
-                    Outputs.at(meta.warp_id % ISSUE_WIDTH).send(trace,1 );
+                if constexpr (!FUNC_ONLY){
+                    if (grp == m_pe_groups.size()-1 ){  // only for last grp to avoid duplicates and free up scoreboard
+                        auto* trace = createInternalTrace(meta);
+                        std::cout << "Writeback TRACE: " << *trace << std::endl;
+                        m_timing.pop();
+                        return trace;
+
+                    }
                 }
             } else if (meta.wb) {
                 m_pe_groups[grp].insertOutput(pe, meta, result);
@@ -377,9 +367,11 @@ void TensorCore::queueWriteback(){
             break;
         }
     }
+    return nullptr;
 }
 
-void TensorCore::drainOutQueue(){
+template <bool FUNC_ONLY>
+vortex::pipeline_trace_t* TensorCore::drainOutQueue(){
     // need a better way to propagate backpressure at the output (or not?)
     // write result in register
 
@@ -406,12 +398,15 @@ void TensorCore::drainOutQueue(){
                     if (!write_back){
                         std::cout << "ERROR : NOT SUPPOSED TO HAPPEN" << std::endl;
                     }
-                    auto& warp = core_->warps_[meta.warp_id];
-                    warp->freg_file_.at(pe + grp*m_config.num_pes)[meta.rd] = val; // TODO: Changed later for partial thread exec
-                    float f_res = 0 ;
-                    float* ptr = reinterpret_cast<float*>(&val);
-                    std::memcpy(&f_res, ptr, sizeof(float));
-                    std::cout << "Wrote back to RG" << grp << " t: " << pe + grp*m_config.num_pes << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
+
+                    if constexpr (FUNC_ONLY){
+                        auto& warp = m_core->warps_[meta.warp_id];
+                        warp->freg_file_.at(pe + grp*m_config.num_pes)[meta.rd] = nan_box(val); // TODO: Changed later for partial thread exec
+                        float f_res = 0 ;
+                        float* ptr = reinterpret_cast<float*>(&val);
+                        std::memcpy(&f_res, ptr, sizeof(float));
+                        std::cout << "Wrote back to RG" << grp << " t: " << pe + grp*m_config.num_pes << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
+                    }
 
                 } else {
                     write_back = false;
@@ -420,25 +415,110 @@ void TensorCore::drainOutQueue(){
         }
 
         if (write_back){
-            core_->issued_instrs_++;
-            m_stat_out_traces++;
+            if constexpr (!FUNC_ONLY){
+                m_core->issued_instrs_++;
+                m_stat_out_traces++;
+            }
             auto* trace = createInternalTrace(meta);
             std::cout << "Writeback TRACE: " << *trace << std::endl;
-            Outputs.at(meta.warp_id % ISSUE_WIDTH).send(trace,1 );
+            return trace;
         }
     }
+    return nullptr;
 }
 
-void TensorCore::tick() {
+////////////////////////////
+//// Timing Tensor Core ////
+////////////////////////////
+
+TimingTensorCore::TimingTensorCore(const SimContext& ctx, vortex::Core* core, Config_t config) : TensorCore(core, config),vortex::ExeUnit(ctx, core, "TensorCore"){
+    m_cycle = 0;
+}
+
+TimingTensorCore::~TimingTensorCore(){
+
+}
+
+void TimingTensorCore::tick() {
     // FOR NOW I ASSUME PARALLEL LOADING (all pe groups are loaded at same time so only need to look at 1 group) (assumption 1)
     // Ensure all threads are synchronized before doing MMA instruction
 
-    drainOutQueue();
-    queueWriteback();
-    compute();
-    handleInput();
+    auto* trace = drainOutQueue<false>();
+    if (trace) {
+        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
+    }
+    trace = queueWriteback<false>();
+    if (trace) {
+        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
+    }
+    compute<false>();
+    for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
+        // Handle inputs
+        auto& input= Inputs.at(i) ;
+        if (input.empty()) {
+            continue;
+        }
+        vortex::pipeline_trace_t* trace = input.front();
+
+        bool accepted = handleInput<false>(trace);
+        if (accepted) {
+            input.pop();
+        }
+    }
 
     m_cycle+= 1;
 
 }
+
+bool TimingTensorCore::isBusy() {
+    bool busy = false;
+    for (int i = 0 ; i < ISSUE_WIDTH; i++) {
+        busy |= !Inputs.at(i).empty();
+        busy |= !Outputs.at(i).empty();
+    }
+    // all other queues in here are empty
+    busy |= !m_timing.empty();
+
+    // only need to check 1 pe group
+    for (int i = 0 ; i < MAX_NUM_WARPS;i++)
+        busy |= !m_pe_groups[0].mata(i).isNonAllocated();
+    busy |= !m_pe_groups[0].getOutputFIFO(0).empty();
+
+    // Print all conditions here:
+
+    return busy;
+}
+
+////////////////////////////
+///// Func Tensor Core /////
+////////////////////////////
+
+FuncTensorCore::FuncTensorCore( vortex::Core* core, Config_t config) : TensorCore(core, Config_t {
+            .num_pe_groups       = config.num_pe_groups,
+            .execution_latency   = 0 ,
+            .num_pes             = config.num_pes,
+            .operand_count       = config.operand_count,
+            .input_mat_buf_depth = 1,
+            .output_fifo_size    = 1,
+            .num_acc_tiles       = config.num_acc_tiles,
+            .num_dot_units       = MAX_NUM_WARPS
+        } ){
+    m_cycle = (uint64_t)(-1);
+}
+
+FuncTensorCore::~FuncTensorCore(){
+
+}
+
+void FuncTensorCore::execute(vortex::pipeline_trace_t* trace){
+    std::cout << "FUNC HANDLE INPUT\n";
+    handleInput<true>(trace);
+    std::cout << "FUNC HANDLE COMPUTE\n";
+    while(compute<true>()); // Step all at once
+    std::cout << "FUNC QUEUE WB\n";
+    queueWriteback<true>(); // returns
+    std::cout << "FUNC DRAIN OUTQ\n";
+    while(auto* trace = drainOutQueue<true>()){delete trace;}; // Wb all at once
+}
+
 

@@ -25,6 +25,7 @@
 #include "warp.h"
 #include "instr.h"
 #include "core.h"
+#include "tensor_core.h"
 
 using namespace vortex;
 
@@ -1343,12 +1344,14 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     if (instr.getNRSrc() > 2) {
       trace->rsrc3 = instr.getRSrc(2);
     }
+    this->core_->func_tensor_core_->execute(trace);
   } break ;
   case TC_FLUSH : {
     trace->exe_type = ExeType::TC;
     trace->wb = true;
     trace->tc_type = TCOpType::FLUSH;
     trace->rsrc1 = instr.getRSrc(0) ;
+    this->core_->func_tensor_core_->execute(trace);
   } break;
 
   case EXT1: {
