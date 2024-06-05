@@ -81,7 +81,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float regA[tc_k * PREC_RATIO];
    float regB[tc_k * PREC_RATIO * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)];
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
-   float regD[OTILE_COL] = {0};
+
    // Main GEMM (simple 1 warp impl)
    for (int i = 0 ; i < MAT_M; i+=tc_m*((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)) {
        C_ptr=C_start + MAT_N*i; // ROW MAJOR
@@ -90,7 +90,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
-           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
+
            #ifdef TILE_ACC_STRATEGY
            tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
            tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
@@ -101,6 +101,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
            for (int k = tc_k ; k < MAT_K; k+=tc_k){
            #else
+           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            for (int k = 0 ; k < MAT_K; k+=tc_k){
            #endif
 
@@ -108,7 +109,16 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
                tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
-               #ifdef DEBUG
+
+
+
+               #ifdef TILE_ACC_STRATEGY
+                   // acc tile (unroll for N times acc tiles)
+                   // repeat this NUM Tile times
+                   //
+                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0) ;
+               #else
+                   #ifdef DEBUG
 
                    vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
                    for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
@@ -133,14 +143,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                        vx_printf("(%d) regC[%d] = %f\n", thread_id, idx, regC[idx]);
                    }
 
-               #endif
-
-
-               #ifdef TILE_ACC_STRATEGY
-                   // acc tile (unroll for N times acc tiles)
-                   // repeat this NUM Tile times
-                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0) ;
-               #else
+                   #endif
                    tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,true>((float*)regA, (float*)regB, (float*)regC);
                #endif
 
@@ -160,11 +163,16 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            #ifdef TILE_ACC_STRATEGY
            // flush tc results for each used tiles
            // Do (initial C) accumulation
+           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
+           float regD[OTILE_COL] = {0};
            tc_flush_tiles<float, OTILE_COL, TC_NUM_ACC_TILES> ((float*)(regD)) ;
 
-           for (int i = 0 ; i < OTILE_COL; i++) {
-               regD[i] = regD[i] + regC[i];
-           }
+           // Treat the float as an unsigned 32-bit integer
+           float* regD_ptr = (float*)(regD);
+           float* regC_ptr = (float*)(regC);
+
+           unrolled_for_func<0,OTILE_COL>(fadd_regs, &regD_ptr, &regC_ptr);
+
            // store
            tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regD, (float*)D_ptr, thread_id, MAT_N);
            #else

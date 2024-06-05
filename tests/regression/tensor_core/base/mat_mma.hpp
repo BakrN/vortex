@@ -247,6 +247,8 @@ inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB , const int wb_tile=
         mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_BUF>(regA, regB,0,wb_tile); // loads zero by default
     } else {
         mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_LOAD>(regA, regB); // loads zero by default
+        regA++;
+        regB++;
 
         if constexpr(num_loads >2)  {
             unrolled_for_func<0, num_loads-2>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB,0,0);
@@ -278,6 +280,18 @@ inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB, const int acc_tile=0
         tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1>(s_regA, s_regB+num_loads,acc_tile+1);
     }
 }
+
+/**
+ * Unrolled accumulation for regC and regD
+ * */
+
+inline void fadd_regs(float** regD, float** regC) {
+    // implement floating point add...
+    asm volatile ("fadd.s %0, %1, %0" : "+f" (**regD) : "f" (**regC));
+    (*regC)++;
+    (*regD)++;
+}
+
 
 #endif
 

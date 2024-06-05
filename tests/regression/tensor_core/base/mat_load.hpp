@@ -203,7 +203,6 @@ inline void tc_load_fragment_a(T* ptr, T* reg , const int thread_id, const int M
     constexpr int col_groups = TC_N / TILE_COLS;
     const int pe_group_id = thread_id  / NUM_PE_PER_GROUP; // number of pes
     const int row_group = pe_group_id / (TILE_ROWS * col_groups); // determines HW config
-
     if constexpr (layout == layout_t::ROW_MAJOR) {
         auto row_offset = MAT_K*(row_group * TILE_ROWS + (thread_id % TILE_ROWS))*OP_size/Res_size;
         //vx_printf("(%d) A(rm) row offset= %d\n", thread_id,  row_offset);
