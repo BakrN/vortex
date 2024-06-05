@@ -24,7 +24,7 @@ template <typename T,
     constexpr int col_groups = TC_N / TILE_COLS;
     const int pe_group_id = thread_id  / NUM_PE_PER_GROUP; // number of pes
     const int col_group = pe_group_id % col_groups; // determines HW config
-    const int row_group = pe_group_id / (TILE_ROWS * col_groups); // determines HW config
+    const int row_group = pe_group_id / (col_groups); // determines HW config
 
     const int start_row = row_group * TILE_ROWS + thread_id % TILE_ROWS; // offset for row
     const int start_col = col_group * TILE_COLS ; // offset for col (based on pe groups
