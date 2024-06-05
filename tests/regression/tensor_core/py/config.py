@@ -153,7 +153,7 @@ tc.operand_count = args["operand_count"]
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
 tc.num_acc_tiles = args["num_acc_tiles"]
-tc.execution_latency = args["mul_latency"] + int(math.ceil(math.log2(args["operand_count"])))*args["add_latency"] + 1 # The +1 is for the final accumulate (+C)
+tc.execution_latency = 3 # 1 mul, 1 reduce, 1 final acc.
 
 # 2. System parameters
 class GEMMArgs:
