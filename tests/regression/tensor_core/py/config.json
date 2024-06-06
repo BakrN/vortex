@@ -1,7 +1,7 @@
 {
-    "M": 4,
-    "N": 4,
-    "K": 4,
+    "M": 8,
+    "N": 8,
+    "K": 8,
     "op_type": "fp16",
     "res_type": "fp32",
     "a_orientation": "row_major",

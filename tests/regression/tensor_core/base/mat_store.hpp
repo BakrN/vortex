@@ -58,7 +58,7 @@ inline void tc_flush(T* dest, const int acc_tile) {
 
 template <typename T, int COL_WIDTH, int NUM_TILES, int start_tile=0, int loop_idx=0>
 inline void tc_flush_tiles(T* dest) {// flush
-    tc_flush<T, COL_WIDTH/NUM_TILES, 0>(dest, start_tile + loop_idx);
+    tc_flush<T, COL_WIDTH, 0>(dest, start_tile + loop_idx);
     if constexpr (loop_idx < NUM_TILES-1) {
         tc_flush_tiles<T, COL_WIDTH, NUM_TILES, start_tile, loop_idx+1>(dest +COL_WIDTH);
     }

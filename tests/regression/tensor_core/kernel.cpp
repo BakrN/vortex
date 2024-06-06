@@ -83,10 +83,10 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
 
    // Main GEMM (simple 1 warp impl)
-   for (int i = 0 ; i < MAT_M; i+=tc_m*((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)) {
+   for (int i = 0 ; i < MAT_M; i+=tc_m) {
        C_ptr=C_start + MAT_N*i; // ROW MAJOR
        D_ptr=D_start + MAT_N*i; // ROW MAJOR
-       for (int j = 0; j < MAT_N ; j+=tc_n*((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)){
+       for (int j = 0; j < MAT_N ; j+=tc_n){
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
@@ -165,7 +165,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            // Do (initial C) accumulation
            tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            float regD[OTILE_COL] = {0};
-           tc_flush_tiles<float, OTILE_COL, TC_NUM_ACC_TILES> ((float*)(regD)) ;
+           tc_flush_tiles<float, TC_NUM_PES, TC_NUM_ACC_TILES> ((float*)(regD)) ;
 
            // Treat the float as an unsigned 32-bit integer
            float* regD_ptr = (float*)(regD);
@@ -178,8 +178,8 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            #else
            tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regC, (float*)D_ptr, thread_id, MAT_N);
            #endif
-           C_ptr=C_ptr + tc_n * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) ; // ROW MAJOR
-           D_ptr=D_ptr + tc_n * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1); // ROW MAJOR
+           C_ptr=C_ptr + tc_n ; // ROW MAJOR
+           D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }
    }
    // Accumulation of first C here
