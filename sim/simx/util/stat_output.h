@@ -3,7 +3,7 @@
 #include "statistic.h"
 #include <fstream>
 
-namespace stat{
+namespace statistics{
     class CSVStatOutput {
         public:
             CSVStatOutput( const std::string& stat_file = "statistic.txt") ;

@@ -236,19 +236,21 @@ inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float
 /**
  * @brief Tensor core matrix multiplication with source accumulation in buffer and intermediate write backs to buffer
  * */
-template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2,int USE_TILES = 1, int LOOP_IDX=0 >
-inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB , const int wb_tile=0) {
+template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2,int USE_TILES = 1, int LOOP_IDX=0, const int tile=0 >
+inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB ) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     float* s_regA = regA;
     float* s_regB = regB;
     //static_assert(num_loads != 1, "For only one load use write back to register file");
 
+    constexpr int wb_tile = tile;
     if constexpr (num_loads ==1) {
         mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_BUF>(regA, regB,0,wb_tile); // loads zero by default
     } else {
         mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_LOAD>(regA, regB); // loads zero by default
         regA++;
         regB++;
+
 
         if constexpr(num_loads >2)  {
             unrolled_for_func<0, num_loads-2>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB,0,0);
@@ -257,7 +259,7 @@ inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB , const int wb_tile=
     }
 
     if constexpr (LOOP_IDX < USE_TILES-1) {
-        tc_mma_acc_zero_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1>(s_regA, s_regB+num_loads,wb_tile+1);
+        tc_mma_acc_zero_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1,wb_tile+1>(s_regA, s_regB+num_loads);
     }
 }
 
@@ -265,11 +267,12 @@ inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB , const int wb_tile=
  * used in conjunction with  tc_mma_acc_IMM_wb_buf
  * A reuse strategy
  * */
-template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int USE_TILES = 1, int LOOP_IDX=0 >
-inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB, const int acc_tile=0) {
+template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int USE_TILES = 1, int LOOP_IDX=0, const int tile =0 >
+inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     float* s_regA = regA;
     //static_assert(num_loads != 1, "For only one load use write back to register file");
+    constexpr int acc_tile = tile;
     if constexpr(num_loads >1)  {
         unrolled_for_func<0, num_loads-1>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB,0,0);
     }
@@ -277,7 +280,7 @@ inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB, const int acc_tile=0
     mat_mma<Accsrc_t::ACC_BUF, WriteBack_t::WB_BUF>(regA, regB, acc_tile,acc_tile); // in hw do it in the beginning
 
     if constexpr (LOOP_IDX < USE_TILES-1) {
-        tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1>(s_regA, ++regB,acc_tile+1);
+        tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1,acc_tile+1>(s_regA, ++regB);
     }
 }
 

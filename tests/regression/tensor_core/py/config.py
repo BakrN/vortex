@@ -23,8 +23,6 @@ parser.add_argument('--operand_count', type=int, help='Number of operands (deter
 parser.add_argument('--input_mat_buf_depth', type=int, help='Depth of input matrix buffer', default=1)
 parser.add_argument('--output_fifo_size', type=int, help='Size of output FIFO', default=1)
 parser.add_argument('--num_acc_tiles', type=int, help='Number of accumulator tiles', default=0)
-parser.add_argument('--mul_latency', type=int, help='Multiplication latency per transprecision adder', default=1)
-parser.add_argument('--add_latency', type=int, help='Addition latency per transprecision adder', default=1)
 parser.add_argument('--num_dot_units', type=int, help='Number of dot units per PE', default=1)
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
@@ -124,6 +122,7 @@ class TCConfig:
     output_fifo_size = 0
     num_acc_tiles = 0
     execution_latency = 0
+    num_dot_units = 1
     def Dnum_pes(self):
         return f"-DTC_NUM_PES={self.num_pes}"
     def Dnum_groups(self):
@@ -138,8 +137,10 @@ class TCConfig:
         return f"-DTC_OUTPUT_FIFO_SIZE={self.output_fifo_size}"
     def Dnum_acc_tiles(self):
         return f"-DTC_NUM_ACC_TILES={self.num_acc_tiles}"
+    def Dnum_dot_units(self):
+        return f"-DTC_NUM_DOT_UNITS={self.num_dot_units}"
     def getdef(self):
-        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Dnum_acc_tiles()}"
+        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Dnum_acc_tiles()} {self.Dnum_dot_units()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -153,7 +154,8 @@ tc.operand_count = args["operand_count"]
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
 tc.num_acc_tiles = args["num_acc_tiles"]
-tc.execution_latency = 3 # 1 mul, 1 reduce, 1 final acc.
+tc.execution_latency = 1
+tc.num_dot_units = args["num_dot_units"]
 
 # 2. System parameters
 class GEMMArgs:

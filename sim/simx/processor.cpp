@@ -18,8 +18,8 @@ using namespace vortex;
 
 ProcessorImpl::ProcessorImpl(const Arch& arch)
   : arch_(arch)
-  , clusters_(arch.num_clusters()),
-  stat_engine_("")
+  , clusters_(arch.num_clusters())
+
 {
   SimPlatform::instance().initialize();
 

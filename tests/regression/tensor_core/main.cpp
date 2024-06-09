@@ -20,6 +20,7 @@ bool float_eq( float a , float b, float epsilon = 0.05) {
 
 vx_device_h device = nullptr;
 const char* kernel_file = "kernel.bin";
+const char* sgemm_file = "sgemm_kernel.bin"; // baseline (sgemm)
 const char *filename = "py";
 
 int main(){
@@ -142,29 +143,32 @@ int main(){
     vx_copy_from_dev(device, D_result, D_ADDR, D_bytes);
 
     // Compare result
-    std::cout << "D RESULT" << std::endl;
-    for (int i = 0 ; i < MM_M; i ++) {
-        for (int j = 0 ; j < MM_N; j++) {
-            std::cout << D_result[i * MM_N + j] << " " ;
-        }
-        std::cout << std::endl;
-    }
+    //std::cout << "D RESULT" << std::endl;
+    //for (int i = 0 ; i < MM_M; i ++) {
+    //    for (int j = 0 ; j < MM_N; j++) {
+    //        std::cout << D_result[i * MM_N + j] << " " ;
+    //    }
+    //    std::cout << std::endl;
+    //}
 
-    std::cout << "D EXPECTED" << std::endl;
-    for (int i = 0 ; i < MM_M; i ++) {
-        for (int j = 0 ; j < MM_N; j++) {
-            std::cout << D_expected[i * MM_N + j] << " " ;
-        }
-        std::cout << std::endl;
-    }
+    //std::cout << "D EXPECTED" << std::endl;
+    //for (int i = 0 ; i < MM_M; i ++) {
+    //    for (int j = 0 ; j < MM_N; j++) {
+    //        std::cout << D_expected[i * MM_N + j] << " " ;
+    //    }
+    //    std::cout << std::endl;
+    //}
 
+    uint32_t errors=0;
     for (int i = 0 ; i < MM_M; i ++) {
         for (int j = 0 ; j < MM_N; j++) {
             if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j], 0.1f)) {
+                errors+=1;
                 std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
             }
         }
     }
+    std::cout << "Total errors: " << errors << std::endl;
 
 
     free(A);

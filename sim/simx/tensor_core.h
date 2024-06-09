@@ -4,6 +4,7 @@
 #include "types.h"
 #include <cstdint>
 #include "tc_helper.h"
+#include "util/statistic.h"
 
 
 #ifndef TC_NUM_PES
@@ -190,6 +191,8 @@ class TensorCore {
         std::queue<std::pair<uint64_t, std::tuple<MATMetadata, uint32_t, std::pair<uint32_t, uint32_t>>>> m_timing; // cycles to wait , (meta, result, (grp,pe))
 
         uint64_t m_stat_out_traces = 0;
+        //Statistics
+        statistics::Statistic* stat_alu_util;
 
 };
 

@@ -31,8 +31,8 @@
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    const int thread_id = vx_thread_id();
-   const int warp_id = vx_warp_id();
-   const int core_id = vx_core_id();
+   //const int warp_id = vx_warp_id();
+   //const int core_id = vx_core_id();
 
    const int MAT_M = kernel_arg->M_;
    const int MAT_N = kernel_arg->N_;
@@ -45,33 +45,39 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    uint32_t log2_num_tasks = (kernel_arg->num_tasks/NUM_THREADS >1 ? kernel_arg->num_tasks/NUM_THREADS >> 1 : 1);
 
-   uint32_t tileSizeX = MAT_N/log2_num_tasks;
-   uint32_t tileSizeY = MAT_M/log2_num_tasks;
+   uint32_t tileSizeCol = MAT_N/log2_num_tasks;
+   uint32_t tileSizeRow = MAT_M/log2_num_tasks;
 
    if (kernel_arg->num_tasks/NUM_THREADS ==2) {
-       tileSizeX = tileSizeX/2;
+       tileSizeCol = MAT_N /2;
+       tileSizeRow = MAT_M;
+       //tileSizeCol = tileSizeCol/2;
+   } else if (kernel_arg->num_tasks/NUM_THREADS ==8) {
+       tileSizeCol = MAT_N /4;
+       tileSizeRow = MAT_M /2 ;
    }
 
-   uint32_t num_blocksX = MAT_N/tileSizeX;
-   uint32_t num_blocksY = MAT_M/tileSizeY;
+   uint32_t num_blocksCols = MAT_N/tileSizeCol;
+
+   uint32_t blockCol  = (task_id/NUM_THREADS) % num_blocksCols;
+   uint32_t blockRow  = (task_id/NUM_THREADS) / num_blocksCols;
+   if (kernel_arg->num_tasks/NUM_THREADS==2){
+       blockRow = 0 ;
+   }
+
+   //vx_printf("task_id: %d, blockCol = %d, blockRow = %d\n", task_id, blockCol, blockRow);
+
+   float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
+   float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO; // assuming col major
+   float* const C_start = (float*const)(kernel_arg->C_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol; // assuming row major
+   float* const D_start = (float*const)(kernel_arg->D_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol;
 
 
-   uint32_t blockX  = (task_id/NUM_THREADS) % num_blocksX;
-   uint32_t blockY  = (task_id/NUM_THREADS) / num_blocksY;
 
-   //vx_printf("task_id: %d, blockX = %d, blockY = %d\n", task_id, blockX, blockY);
-
-   float* const A_start = (float*const)(kernel_arg->A_addr) + blockY*MAT_N*PREC_RATIO ; // Assuming row major
-   float* const B_start = (float*const)(kernel_arg->B_addr) + blockX*MAT_K*PREC_RATIO; // assuming col major
-   float* const C_start = (float*const)(kernel_arg->C_addr) + blockY*MAT_N + blockX *tileSizeX; // assuming row major
-   float* const D_start = (float*const)(kernel_arg->D_addr) + blockY*MAT_N + blockX *tileSizeX;
-
-
-
-   const layout_t a_layout = (layout_t)(kernel_arg->A_layout);
-   const layout_t b_layout = (layout_t)(kernel_arg->B_layout);
-   const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
-   const layout_t d_layout = (layout_t)(kernel_arg->D_layout);
+   //const layout_t a_layout = (layout_t)(kernel_arg->A_layout);
+   //const layout_t b_layout = (layout_t)(kernel_arg->B_layout);
+   //const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
+   //const layout_t d_layout = (layout_t)(kernel_arg->D_layout);
 
    float* A_ptr = A_start;
    float* B_ptr = B_start;
@@ -83,10 +89,10 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float regC[OTILE_COL] = {0}; // this should be equal to tc_n
 
    // Main GEMM (simple 1 warp impl)
-   for (int i = 0 ; i < MAT_M; i+=tc_m) {
+   for (int i = 0; i < tileSizeRow; i+=tc_m) {
        C_ptr=C_start + MAT_N*i; // ROW MAJOR
        D_ptr=D_start + MAT_N*i; // ROW MAJOR
-       for (int j = 0; j < MAT_N ; j+=tc_n){
+       for (int j = 0; j < tileSizeCol; j+=tc_n){
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
@@ -95,7 +101,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
            tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
-           tc_mma_acc_zero_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0);
+           tc_mma_acc_zero_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB);
            A_ptr+=tc_k * PREC_RATIO; // assuming row major
            B_ptr+=tc_k * PREC_RATIO; // assumming col_major
 
@@ -116,7 +122,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                    // acc tile (unroll for N times acc tiles)
                    // repeat this NUM Tile times
                    //
-                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB, 0) ;
+                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB) ;
                #else
                    #ifdef DEBUG
 

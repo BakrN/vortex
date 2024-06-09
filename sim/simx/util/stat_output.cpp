@@ -1,6 +1,6 @@
 #include "stat_output.h"
 
-using namespace stat;
+using namespace statistics;
 
 CSVStatOutput::CSVStatOutput( const std::string& stat_file ) : fname(stat_file) {
     file.open(fname, std::ios::out | std::ios::app);

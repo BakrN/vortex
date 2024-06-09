@@ -1,7 +1,7 @@
 #ifndef _STATISTIC_H
 #define _STATISTIC_H
 #include <string>
-namespace stat{
+namespace statistics{
 
     //class StatisticBase {
     //};

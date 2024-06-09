@@ -568,7 +568,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
   case InstType::I_TYPE: {
     if (op == Opcode::TC_FLUSH) {
         instr->addSrcReg(rs1, RegType::TC);
-        std::cout << " TC Flush instruction to reg " << rd << std::endl;
+        //std::cout << " TC Flush instruction to reg " << rd << std::endl;
     } else {
         instr->addSrcReg(rs1, RegType::Integer);
     }
@@ -732,41 +732,41 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         std::abort();
       }
     } else if (op == Opcode::MMA) {
-        std::cout << "MMA Instruction: " ;
+        //std::cout << "MMA Instruction: " ;
         // using sam
         instr->addSrcReg(rs1 , RegType::Float);
         instr->addSrcReg(rs2 , RegType::Float);
-        std::cout << " src1: " << rs1 << " src2: " << rs2 ;
-        std::cout << " wb: ";
+        //std::cout << " src1: " << rs1 << " src2: " << rs2 ;
+        //std::cout << " wb: ";
 
         if (func3 ==0 ) { // (determine wb destination) (0: loading , 1: TC, 2: Acc buffer)
-            std::cout << " loading phase " ;
+            //std::cout << " loading phase " ;
         } else if (func3 == 1) {
             instr->setDestReg(rd, RegType::Float);
-            std::cout << " reg file " << rd ;
+            //std::cout << " reg file " << rd ;
         } else if (func3==2) {
             instr->setDestReg(rd, RegType::TC);
-            std::cout << "tc buf " << rd ;
+            //std::cout << "tc buf " << rd ;
         }
-        std::cout << " acc_source: ";
+        //std::cout << " acc_source: ";
         if (func2 == 0) { // let's say none is 0 or whatever ...
-            std::cout << "none " ;
+            //std::cout << "none " ;
             // no accumulation source
         } else if (func2 ==1) {
             // accumulation source is register
-            std::cout << "reg file "  << rs3;
+            //std::cout << "reg file "  << rs3;
             instr->addSrcReg(rs3, RegType::Float);
         } else if (func2==2){
             // acc src is tile row
-            std::cout << "acc buffer " << rs3;
+            //std::cout << "acc buffer " << rs3;
             instr->addSrcReg(rs3, RegType::TC);
         }
         else {
             // acc src is tile row
             instr->setImm(rs3);
-            std::cout << "acc imm" << rs3;// 0 pad immediate (potentially more useful immediate generators?)
+            //std::cout << "acc imm" << rs3;// 0 pad immediate (potentially more useful immediate generators?)
         }
-        std::cout << std::endl ;
+        //std::cout << std::endl ;
 
         instr->setFunc2(func2);
         instr->setFunc3(func3);

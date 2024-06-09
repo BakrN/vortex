@@ -18,7 +18,7 @@
 #include "constants.h"
 #include "dcrs.h"
 #include "cluster.h"
-#include <util/stat_engine.h>
+
 
 
 class vx_device;
@@ -66,7 +66,7 @@ private:
   uint64_t perf_mem_writes_;
   uint64_t perf_mem_latency_;
   uint64_t perf_mem_pending_reads_;
-  stat::StatEngine stat_engine_;
+
 };
 
 }

@@ -7,7 +7,7 @@
 #include "statistic.h"
 #include "stat_output.h"
 
-namespace stat{
+namespace statistics{
 
 
 class StatEngine {

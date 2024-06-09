@@ -92,6 +92,7 @@ Core::Core(const SimContext& ctx,
   tc_config.input_mat_buf_depth = TC_MAT_BUF_DEPTH;
   tc_config.output_fifo_size = TC_OUTPUT_FIFO_SIZE;
   tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
+  tc_config.num_dot_units = TC_NUM_DOT_UNITS;
 
   tc_operand_count = tc_config.operand_count;
   exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TimingTensorCore>(this, tc_config);
@@ -342,9 +343,9 @@ void Core::commit() {
     // update scoreboard
     if (trace->eop) {
       if (trace->wb) {
-        if (trace->exe_type == ExeType::TC){
-            std::cout << "Scoreboard released" << std::endl;
-        }
+        //if (trace->exe_type == ExeType::TC){
+        //    std::cout << "Scoreboard released" << std::endl;
+        //}
         scoreboard_.release(trace);
       }
 

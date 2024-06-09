@@ -1,8 +1,9 @@
 #include "stat_engine.h"
-using namespace stat;
+using namespace statistics;
 
 StatEngine::StatEngine(const std::string& stat_file) {
     fname = stat_file;
+    // Write out initial
 }
 
 StatEngine::~StatEngine() {
