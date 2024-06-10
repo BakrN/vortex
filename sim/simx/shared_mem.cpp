@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,6 +16,7 @@
 #include <bitmanip.h>
 #include <vector>
 #include "types.h"
+#include "util/statistic.h"
 
 using namespace vortex;
 
@@ -27,23 +28,30 @@ protected:
     uint32_t  bank_sel_addr_start_;
     uint32_t  bank_sel_addr_end_;
     PerfStats perf_stats_;
+    statistics::Statistic* stat_reads;
+    statistics::Statistic* stat_writes;
+    statistics::Statistic* stat_bank_stalls;
 
     uint64_t to_local_addr(uint64_t addr) {
-        uint32_t total_lines = config_.capacity / config_.line_size;        
+        uint32_t total_lines = config_.capacity / config_.line_size;
         uint32_t line_bits = log2ceil(total_lines);
         uint32_t offset = bit_getw(addr, 0, line_bits-1);
         return offset;
     }
 
 public:
-    Impl(SharedMem* simobject, const Config& config) 
+    Impl(SharedMem* simobject, const Config& config, const std::string& name)
         : simobject_(simobject)
         , config_(config)
         , ram_(config.capacity, config.capacity)
         , bank_sel_addr_start_(0)
         , bank_sel_addr_end_(0 + log2ceil(config.num_banks)-1)
-    {}    
-    
+    {
+        stat_reads       = SimPlatform::instance().get_stat_engine().registerStatistic(name + ".reads");
+        stat_writes      = SimPlatform::instance().get_stat_engine().registerStatistic(name + ".writes");
+        stat_bank_stalls = SimPlatform::instance().get_stat_engine().registerStatistic(name + ".bank_stalls");
+    }
+
     virtual ~Impl() {}
 
     void reset() {
@@ -51,13 +59,13 @@ public:
     }
 
     void read(void* data, uint64_t addr, uint32_t size) {
-        auto s_addr = to_local_addr(addr);        
+        auto s_addr = to_local_addr(addr);
         DPH(3, "Shared Mem addr=0x" << std::hex << s_addr << std::endl);
         ram_.read(data, s_addr, size);
     }
 
     void write(const void* data, uint64_t addr, uint32_t size) {
-        auto s_addr = to_local_addr(addr);        
+        auto s_addr = to_local_addr(addr);
         DPH(3, "Shared Mem addr=0x" << std::hex << s_addr << std::endl);
         ram_.write(data, s_addr, size);
     }
@@ -65,7 +73,7 @@ public:
     void tick() {
         std::vector<bool> in_used_banks(config_.num_banks);
         for (uint32_t req_id = 0; req_id < config_.num_reqs; ++req_id) {
-            auto& core_req_port = simobject_->Inputs.at(req_id);            
+            auto& core_req_port = simobject_->Inputs.at(req_id);
             if (core_req_port.empty())
                 continue;
 
@@ -79,6 +87,7 @@ public:
             // bank conflict check
             if (in_used_banks.at(bank_id)) {
                 ++perf_stats_.bank_stalls;
+                stat_bank_stalls->addValue(1);
                 continue;
             }
 
@@ -91,26 +100,29 @@ public:
             }
 
             // update perf counters
-            perf_stats_.reads += !core_req.write;            
+            perf_stats_.reads += !core_req.write;
             perf_stats_.writes += core_req.write;
+
+            stat_reads->addValue(!core_req.write);
+            stat_writes->addValue(core_req.write);
 
             // remove input
             core_req_port.pop();
         }
     }
 
-    const PerfStats& perf_stats() const { 
-        return perf_stats_; 
+    const PerfStats& perf_stats() const {
+        return perf_stats_;
     }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SharedMem::SharedMem(const SimContext& ctx, const char* name, const Config& config) 
-    : SimObject<SharedMem>(ctx, name)   
+SharedMem::SharedMem(const SimContext& ctx, const char* name, const Config& config)
+    : SimObject<SharedMem>(ctx, name)
     , Inputs(config.num_reqs, this)
     , Outputs(config.num_reqs, this)
-    , impl_(new Impl(this, config))
+    , impl_(new Impl(this, config, std::string(name)))
 {}
 
 SharedMem::~SharedMem() {

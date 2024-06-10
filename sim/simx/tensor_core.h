@@ -158,7 +158,7 @@ class TensorCore {
             size_t num_acc_tiles;
             size_t num_dot_units=1;
 
-            void print(){
+            void print() const{
                 std::cout << "TensorCore Config: " << std::endl;
                 std::cout << "num_pe_groups: " << num_pe_groups << std::endl;
                 std::cout << "execution_latency: " << execution_latency << std::endl;
@@ -186,7 +186,7 @@ class TensorCore {
 
         vortex::pipeline_trace_t* createInternalTrace(const MATMetadata&);
         vortex::Core* m_core;
-        Config_t m_config;
+        const Config_t m_config;
         std::vector<PEGroup> m_pe_groups;
         std::queue<std::pair<uint64_t, std::tuple<MATMetadata, uint32_t, std::pair<uint32_t, uint32_t>>>> m_timing; // cycles to wait , (meta, result, (grp,pe))
 

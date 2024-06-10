@@ -12,12 +12,12 @@
     "num_warps": 8,
     "num_clusters": 1,
     "num_cores": 1,
-    "num_groups": 2,
+    "num_groups": 1,
     "num_dot_units": 1,
-    "operand_count": 8,
+    "operand_count": 16,
     "input_mat_buf_depth": 1,
     "output_fifo_size": 1,
-    "num_acc_tiles": 4,
+    "num_acc_tiles": 2,
     "define_file": "defines.txt"
 }
 

@@ -3,7 +3,7 @@
 using namespace statistics;
 
 CSVStatOutput::CSVStatOutput( const std::string& stat_file ) : fname(stat_file) {
-    file.open(fname, std::ios::out | std::ios::app);
+    file.open(fname, std::ios::out );
     if (!file.is_open()) {
         throw std::runtime_error("Failed to open file: " + fname);
     }

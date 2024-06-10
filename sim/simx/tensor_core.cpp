@@ -74,7 +74,7 @@ vortex::pipeline_trace_t* TensorCore::createInternalTrace(const MATMetadata& met
 template <bool FUNC_ONLY>
 bool TensorCore::handleInput(vortex::pipeline_trace_t* trace){
 
-    static int count = 0;
+    //static int count = 0;
 
     // Load Inputs (assumption parallel loading)
     auto wid = trace->wid;
@@ -270,7 +270,7 @@ bool TensorCore::compute(){
             // otherwise process new loaded row
             else if (m_pe_groups[grp].isReadyToFire(wid) ){
                 if constexpr (!FUNC_ONLY) {
-                    stat_alu_util->addValue((m_config.operand_count+1)/2) ;  // add num of loads
+                    stat_alu_util->addValue((m_config.operand_count+1)/2 ) ;  // add num of loads
                 }
                 fired = true;
                 //m_core->issued_ins
@@ -299,7 +299,7 @@ bool TensorCore::compute(){
                     int_result += C_f;
                     uint32_t result = float32_to_uint32(int_result);
                     // queue
-                    uint64_t timing = m_pe_groups[grp].getStep(wid)==0 ? m_cycle + m_config.execution_latency : (!m_timing.empty() ? m_timing.back().first + (m_config.operand_count+1)/2 *m_config.execution_latency + 1 : m_cycle + (m_config.operand_count+1)/2 *m_config.execution_latency +1); // stepping takes num_load times per step
+                    uint64_t timing = m_pe_groups[grp].getStep(wid)==0 ? m_cycle + m_config.execution_latency : (!m_timing.empty() ? m_timing.back().first + (m_config.operand_count+1)/2 *m_config.execution_latency  : m_cycle + (m_config.operand_count+1)/2 *m_config.execution_latency ); // stepping takes num_load times per step
                     m_timing.push({timing, {meta, result, {grp, pe}}});
                 }
                 m_pe_groups[grp].popMeta(wid); // Consume meta
@@ -454,7 +454,7 @@ void TimingTensorCore::tick() {
     if (trace) {
         Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
     }
-    compute<false>();
+
     for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
         // Handle inputs
         auto& input= Inputs.at(i) ;
@@ -468,6 +468,8 @@ void TimingTensorCore::tick() {
             input.pop();
         }
     }
+
+    compute<false>(); // directly forward to alu
 
     m_cycle+= 1;
 
