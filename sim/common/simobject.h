@@ -21,6 +21,7 @@
 #include <queue>
 #include <assert.h>
 #include "mempool.h"
+#include "util/stat_engine.h"
 
 class SimObjectBase;
 
@@ -382,15 +383,19 @@ public:
     ++cycles_;
   }
 
+  statistics::StatEngine& get_stat_engine() { return sim_engine_;}
   uint64_t cycles() const {
     return cycles_;
   }
 
 private:
 
-  SimPlatform() : cycles_(0) {}
+  SimPlatform() : cycles_(0) {
+      schedule_recurring([&](){sim_engine_.outputStatistics(cycles_);}, 10000);
+  }
 
   virtual ~SimPlatform() {
+    //sim_engine_.outputStatistics(cycles_);
     this->clear();
   }
 
@@ -412,6 +417,7 @@ private:
   uint64_t cycles_;
 
   template <typename U> friend class SimPort;
+  statistics::StatEngine sim_engine_;
   friend class SimObjectBase;
 };
 
