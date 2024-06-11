@@ -446,15 +446,15 @@ void TimingTensorCore::tick() {
     // FOR NOW I ASSUME PARALLEL LOADING (all pe groups are loaded at same time so only need to look at 1 group) (assumption 1)
     // Ensure all threads are synchronized before doing MMA instruction
 
-    auto* trace = drainOutQueue<false>();
-    if (trace) {
-        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
-    }
-    trace = queueWriteback<false>();
-    if (trace) {
-        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
-    }
 
+    auto* trace = queueWriteback<false>();
+    if (trace) {
+        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
+    }
+    trace = drainOutQueue<false>();
+    if (trace) {
+        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace,1);
+    }
     for (uint32_t i = 0; i < ISSUE_WIDTH; ++i) {
         // Handle inputs
         auto& input= Inputs.at(i) ;

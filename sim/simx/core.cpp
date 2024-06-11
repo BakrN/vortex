@@ -318,7 +318,7 @@ void Core::execute() {
     auto& dispatch = dispatchers_.at(i);
     auto& exe_unit = exe_units_.at(i);
     for (uint32_t j = 0; j < ISSUE_WIDTH; ++j) {
-      if (dispatch->Outputs.at(j).empty() || !exe_unit->Inputs.at(j).empty()) // Bakr edit: only continue if input port of input queue is also empty (this is important to propagate backpressure)
+      if (dispatch->Outputs.at(j).empty())
         continue;
       auto trace = dispatch->Outputs.at(j).front();
       exe_unit->Inputs.at(j).send(trace, 1);
