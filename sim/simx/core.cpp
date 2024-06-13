@@ -91,7 +91,8 @@ Core::Core(const SimContext& ctx,
   tc_config.operand_count = TC_OP_COUNT;
   tc_config.input_mat_buf_depth = TC_MAT_BUF_DEPTH;
   tc_config.output_fifo_size = TC_OUTPUT_FIFO_SIZE;
-  tc_config.num_acc_tiles = TC_NUM_ACC_TILES;
+  tc_config.outer_product_cols = TC_OUTER_PRODUCT_COLS;
+  tc_config.outer_product_rows = TC_OUTER_PRODUCT_ROWS;
   tc_config.num_dot_units = TC_NUM_DOT_UNITS;
 
   tc_operand_count = tc_config.operand_count;

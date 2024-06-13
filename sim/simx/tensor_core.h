@@ -54,7 +54,8 @@ class PEGroup {
             size_t operand_count,
             size_t input_mat_buf_depth, // Operands fifo depth
             size_t output_fifo_size,
-            size_t num_acc_tiles
+            size_t outer_product_cols,
+            size_t outer_product_rows
             );
         ~PEGroup();
 
@@ -118,7 +119,7 @@ class PEGroup {
         MATBuffer<uint16_t>& mata  (int wid) { return m_mat_a[wid]; }
         MATBuffer<uint16_t>& matb  (int wid) { return m_mat_b[wid]; }
         MATBuffer<uint32_t>& matc  (int wid) { return m_mat_c[wid]; }
-        AccBuffer<uint32_t>& tileAccumulator(int wid) { return m_tile_accumulator[wid];}
+        AccBuffer<uint32_t>& tileAccumulator(int wid, int pe) { return m_tile_accumulator[wid][pe];}
         TCOutputFifo& getOutputFIFO(size_t pe) { return m_output_fifo[pe]; }
 
 
@@ -127,7 +128,7 @@ class PEGroup {
         MATBuffer<uint16_t> m_mat_a[MAX_NUM_WARPS]; // max number of warps
         MATBuffer<uint16_t> m_mat_b[MAX_NUM_WARPS];
         MATBuffer<uint32_t> m_mat_c[MAX_NUM_WARPS];
-        std::vector<AccBuffer<uint32_t>> m_tile_accumulator;
+        std::vector<std::vector<AccBuffer<uint32_t>>> m_tile_accumulator; // wid pe
 
         std::vector<TCOutputFifo> m_output_fifo; // 1 per PE (warp_id, reg, val)
         std::vector<std::queue<MATMetadata>> m_wb_meta;
@@ -152,10 +153,11 @@ class TensorCore {
             size_t execution_latency = 8;
             // PE Group parameter
             size_t num_pes;
-            size_t operand_count;
+            size_t operand_count; // K Size
             size_t input_mat_buf_depth;
             size_t output_fifo_size;
-            size_t num_acc_tiles;
+            size_t outer_product_cols;
+            size_t outer_product_rows;
             size_t num_dot_units=1;
 
             void print() const{
@@ -166,7 +168,8 @@ class TensorCore {
                 std::cout << "operand_count: " << operand_count << std::endl;
                 std::cout << "input_mat_buf_depth: " << input_mat_buf_depth << std::endl;
                 std::cout << "output_fifo_size: " << output_fifo_size << std::endl;
-                std::cout << "num_acc_tiles: " << num_acc_tiles << std::endl;
+                std::cout << "outer_product_cols: " << outer_product_cols << std::endl;
+                std::cout << "outer_product_rows: " << outer_product_rows << std::endl;
                 std::cout << "num_dot_units: " << num_dot_units<< std::endl;
             }
         };

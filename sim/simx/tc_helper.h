@@ -203,21 +203,23 @@ template <typename T = uint32_t>
 class AccBuffer { // Accumulator buffer
     public:
         AccBuffer() {}
-        AccBuffer(size_t col_width,
-                  size_t num_cols ,
-                  size_t num_tiles
-                  ) : m_col_width(col_width), m_num_cols(num_cols), m_num_tiles(num_tiles), m_locked(0){
+        AccBuffer(size_t shift_reg_size,
+                  size_t outer_product_cols,
+                  size_t outer_product_rows
+                  ) : m_shifter_width(shift_reg_size), m_cols(outer_product_cols), m_rows(outer_product_rows), m_locked(0){
 
-            m_locked.resize(num_tiles, 0);
-            m_data.resize(num_tiles);
-            m_head.resize(num_tiles);
-            m_tail.resize(num_tiles);
-            for (size_t i = 0 ; i < num_tiles; i++){
-                m_data[i].resize(num_cols);
-                m_head[i].resize(num_cols,0);
-                m_tail[i].resize(num_cols,0);
-                for (size_t j = 0 ; j < num_cols; j++) {
-                    m_data[i][j].resize(col_width, 0);
+            m_locked.resize(m_rows);
+            m_data.resize(m_rows);
+            m_head.resize(m_rows);
+            m_tail.resize(m_rows);
+            for (size_t i = 0 ; i < m_rows; i++){
+                m_locked[i].resize(m_cols,0);
+                m_data[i].resize(m_cols);
+                m_head[i].resize(m_cols,0);
+                m_tail[i].resize(m_cols,0);
+
+                for (size_t j = 0 ; j < m_rows; j++) {
+                    m_data[i][j].resize(m_shifter_width, 0);
                 }
             }
         }
@@ -225,43 +227,42 @@ class AccBuffer { // Accumulator buffer
         ~AccBuffer() {
         }
 
-        T read(size_t col, size_t tile=0) { // used for accumulation
-            T res = m_data[tile][col][m_tail[tile][col]];
-            m_tail[tile][col] = (m_tail[tile][col]+1) % m_col_width;
+        T read(size_t row, size_t col) { // used for accumulation
+            T res = m_data[row][col][m_tail[row][col]];
+            m_tail[row][col] = (m_tail[row][col]+1) % m_shifter_width;
             return res;
         }
 
-        T readShifted(size_t col , size_t tile=0) {  // for output
-            size_t shift =((m_tail[tile][col] - col)%m_col_width) ;
-            T res = m_data[tile][col][((m_tail[tile][col] - col)%m_col_width) ];
-            m_tail[tile][col] = (m_tail[tile][col]+1) % m_col_width;
+        T readShifted(size_t row, size_t col) {  // for output
+            T res = m_data[row][col][((m_tail[row][col] - col)%m_shifter_width) ];
+            m_tail[row][col] = (m_tail[row][col]+1) % m_shifter_width;
             return res;
         }
 
-        void insert(T value, size_t col, size_t tile=0) {
-            m_data[tile][col][m_head[tile][col]] = value;
-            m_head[tile][col] = (m_head[tile][col]+1) % m_col_width;
-            if (m_locked[tile] && col==0) {
-                m_locked[tile] -=1 ;
+        void insert(T value, size_t row,size_t col ) {
+            m_data[row][col][m_head[row][col]] = value;
+            m_head[row][col] = (m_head[row][col]+1) % m_shifter_width;
+            if (m_locked[row][col] ) {
+                m_locked[row][col] -=1 ;
             }
         }
 
-        bool isLocked(int tile) {
-            return m_locked[tile]!=0;
+        bool isLocked(size_t row ,size_t col) {
+            return m_locked[row][col]!=0;
         }
 
-        void lock(int tile){
-            m_locked[tile] = m_col_width;
+        void lock(size_t row, size_t col){
+            m_locked[row][col] = m_shifter_width;
         }
 
     private:
         std::vector<std::vector<std::vector<T>>> m_data;
-        std::vector<std::vector<size_t>> m_head;
+        std::vector<std::vector<size_t>> m_head; // access using row , col , idx
         std::vector<std::vector<size_t>> m_tail;
-        size_t m_num_cols;
-        size_t m_col_width;
-        size_t m_num_tiles;
-        std::vector<int> m_locked; // locks tile , unlocks on 0 col
+        size_t m_cols;
+        size_t m_rows;
+        size_t m_shifter_width; // z dimension
+        std::vector<std::vector<int>> m_locked; // locks tile , unlocks on 0 col
 };
 
 

@@ -10,15 +10,19 @@ inline uint64_t nan_box(uint32_t value) {
   return value | mask;
 }
 
-PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t output_fifo_size, size_t num_acc_tiles)  :
+PEGroup::PEGroup(size_t num_pes,size_t operands_count,size_t input_mat_buf_depth, size_t output_fifo_size, size_t outer_product_rows, size_t outer_product_cols
+)  :
     m_num_pes(num_pes)
 {
     m_wb_meta.resize(MAX_NUM_WARPS);
+    m_tile_accumulator.resize(MAX_NUM_WARPS);
     for (int i = 0 ; i < MAX_NUM_WARPS; i++) {
         m_mat_a[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
         m_mat_b[i] = MATBuffer<uint16_t>(operands_count, input_mat_buf_depth, num_pes);
         m_mat_c[i] = MATBuffer<uint32_t>(num_pes, input_mat_buf_depth,num_pes);
-        m_tile_accumulator.emplace_back(AccBuffer<uint32_t>(num_pes, num_pes, num_acc_tiles));
+        for (size_t j = 0 ; j < num_pes; j++) {
+            m_tile_accumulator[i].emplace_back(AccBuffer<uint32_t>(num_pes,  outer_product_cols, outer_product_rows));
+        }
         m_cur_step[i] = 0;
     }
     for (size_t i = 0; i < num_pes; i++) {
@@ -51,7 +55,7 @@ TensorCore::TensorCore(vortex::Core* core, Config_t config) :   m_core(core), m_
     m_config.print();
     // initialize the PE Groups
     for (size_t i = 0; i < config.num_pe_groups; i++) {
-        PEGroup grp(config.num_pes, config.operand_count, config.input_mat_buf_depth, config.output_fifo_size, config.num_acc_tiles);
+        PEGroup grp(config.num_pes, config.operand_count, config.input_mat_buf_depth, config.output_fifo_size, config.outer_product_rows, config.outer_product_cols);
         m_pe_groups.emplace_back(grp);
     }
 }
@@ -88,7 +92,8 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace){
     }
 
     // check if tile is locked (if it is then don't accept warp) (acc source)
-    if (trace->tc_type == vortex::TCOpType::ACC_BUF && m_pe_groups[0].tileAccumulator(trace->wid).isLocked(trace->rsrc3)) {
+    if (trace->tc_type == vortex::TCOpType::ACC_BUF && m_pe_groups[0].tileAccumulator(trace->wid,0).isLocked(trace->rsrc3/m_config.outer_product_cols ,trace->rsrc3/m_config.outer_product_rows  )) { // all operate synchronously so can check 1 pe
+
         return false;
     }
 
@@ -123,9 +128,9 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace){
                 meta.flush = false;
                 //std::cout << "meta rd: " << meta.rd << std::endl;
                 if (!trace->wb) {
-                    m_pe_groups[grp].tileAccumulator(trace->wid).lock(trace->rdest);
                     // Assumption: the wb to buffer instruction is only used once at the very last load into tc core. So I fill out the metas for consistency with the same write back to same tile
                     for (size_t i= 0 ; i< m_config.num_pes; i++) {
+                        m_pe_groups[grp].tileAccumulator(trace->wid,i).lock(trace->rdest/m_config.outer_product_cols ,trace->rdest % m_config.outer_product_cols);
                         m_pe_groups[grp].addMeta(meta, wid);
                         //if (i >0 && grp==0 && trace->eop) {
                         //    m_core->committed_instrs_++;
@@ -209,7 +214,7 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace){
             assert(!pe_grp.matc(wid).isBackEmpty()); // assertion here that back is empty
             auto tile = trace->rsrc3;
             for (size_t col = 0;  col < m_config.num_pes; col++){
-                c = m_pe_groups[grp].tileAccumulator(wid).readShifted(pe, tile);
+                c = m_pe_groups[grp].tileAccumulator(wid,col).readShifted(tile/m_config.outer_product_cols, tile % m_config.outer_product_cols);
                 pe_grp.matc(wid).insert(c, pe);
             }
         } else if (trace->tc_type == vortex::TCOpType::ACC_IMM) {
@@ -338,7 +343,7 @@ vortex::pipeline_trace_t* TensorCore::queueWriteback(){
                 // for all pes in grp
                 auto& warp = m_core->warps_[meta.warp_id];
                 for (size_t p = 0 ; p < m_config.num_pes; p++) {
-                    uint32_t val  = m_pe_groups[grp].tileAccumulator(meta.warp_id).readShifted(p,meta.flush_tile);
+                    uint32_t val  = m_pe_groups[grp].tileAccumulator(meta.warp_id,p).readShifted(meta.flush_tile / m_config.outer_product_cols, meta.flush_tile % m_config.outer_product_cols);
 
                     if constexpr (FUNC_ONLY){
                         warp->freg_file_.at(p + grp*m_config.num_pes)[meta.rd] = nan_box(val); // TODO: Changed later for partial thread exec
@@ -361,7 +366,7 @@ vortex::pipeline_trace_t* TensorCore::queueWriteback(){
                 m_pe_groups[grp].insertOutput(pe, meta, result);
                 //std::cout << "Queue to REG GRP " << grp << " pe: " << pe << " : warp_id: " << meta.warp_id << " reg: " << meta.rd << " val: " << f_res << std::endl;
             } else {
-                m_pe_groups[grp].tileAccumulator(meta.warp_id).insert(result, pe, meta.rd);
+                m_pe_groups[grp].tileAccumulator(meta.warp_id,pe).insert(result, meta.rd/m_config.outer_product_cols, meta.rd % m_config.outer_product_cols);
                 //std::cout << "Queue to TILE GRP" << grp << " pe: " << pe << " : warp_id: " << meta.warp_id << " tile: " << meta.rd << " val: " << f_res << std::endl;
             }
 
@@ -505,7 +510,9 @@ FuncTensorCore::FuncTensorCore( vortex::Core* core, Config_t config) : TensorCor
             .operand_count       = config.operand_count,
             .input_mat_buf_depth = 1,
             .output_fifo_size    = 1,
-            .num_acc_tiles       = config.num_acc_tiles,
+            .outer_product_cols  = config.outer_product_cols,
+            .outer_product_rows  = config.outer_product_rows,
+
             .num_dot_units       = MAX_NUM_WARPS
         } ){
     m_cycle = (uint64_t)(-1);
