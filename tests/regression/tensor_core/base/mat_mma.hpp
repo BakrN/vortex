@@ -205,61 +205,92 @@ inline void mat_mma_unroll (float** regA, float** regB,  typename AccsrcSelector
 /**
  * @brief Tensor core matrix multiplication with accumulation in register file and write back to register file
  * */
-template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, bool IN_PLACE =true>
+template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int OUTER_PRODUCT_COLS, int OUTER_PRODUCT_ROWS, bool IN_PLACE =true, /*For loop unroll management*/ int CUR_ROW=0, int CUR_COL=0>
 inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float* regD=nullptr) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     static_assert(num_loads >= STEPS, "Steps cannot be larger than number of loads when using register file as accumulator. Because if steps is more that means my C register per PE is not entirely filled");
     // if it's equal to 1 then just store back directly
+    float* s_regA = regA + num_loads * CUR_ROW;
+    float* s_regB = regB + num_loads * CUR_COL;
+    float* s_regC = regC + STEPS * CUR_ROW + CUR_COL;
+    float* s_regD = regD ;
+    if constexpr (!IN_PLACE) {
+        s_regD = regD + STEPS * CUR_ROW + CUR_COL;
+    }
     if constexpr(num_loads == 1) {
         static_assert(STEPS == 1, "");
         if constexpr (IN_PLACE) {
-            mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>(regA, regB, regC, regC);
+            mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>(s_regA, s_regB, s_regC, s_regC);
         } else {
-            mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>(regA, regB, regC,regD);
+            mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>(s_regA, s_regB, s_regC,s_regD);
         }
     } else {
         if constexpr (num_loads > STEPS) {
             // WB load (so I don't reserve and if I use inplace I will stall otherwise)
-            //unrolled_for_func<STEPS, num_loads>(mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_LOAD>, regA++, regB++, regC,regD);
-            unrolled_for_func<STEPS, num_loads>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB ,0,0);
+            //unrolled_for_func<STEPS, num_loads>(mat_mma<Accsrc_t::ACC_REG, WriteBack_t::WB_LOAD>, s_regA++, s_regB++, s_regC,s_regD);
+            unrolled_for_func<STEPS, num_loads>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &s_regA, &s_regB ,0,0);
         }
         // Unroll the rest
-        //unrolled_for_func<0, STEPS>(mat_mma<Accsrc_t::ACC_NONE, WriteBack_t::WB_REG>, regA++, regB++, regC++,regD++);
+        //unrolled_for_func<0, STEPS>(mat_mma<Accsrc_t::ACC_NONE, WriteBack_t::WB_REG>, s_regA++, s_regB++, s_regC++,s_regD++);
         if constexpr (IN_PLACE){
-            unrolled_for_func<0, STEPS>(mat_mma_unroll<Accsrc_t::ACC_REG, WriteBack_t::WB_REG,true>, &regA, &regB, &regC, &regC);
+            unrolled_for_func<0, STEPS>(mat_mma_unroll<Accsrc_t::ACC_REG, WriteBack_t::WB_REG,true>, &s_regA, &s_regB, &s_regC, &s_regC);
         } else {
-            unrolled_for_func<0, STEPS>(mat_mma_unroll<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>, &regA, &regB, &regC, &regD);
+            unrolled_for_func<0, STEPS>(mat_mma_unroll<Accsrc_t::ACC_REG, WriteBack_t::WB_REG>, &s_regA, &s_regB, &s_regC, &s_regD);
+        }
+    }
+
+    // Outer product accumulation loop unroll
+
+    if constexpr(CUR_ROW < OUTER_PRODUCT_ROWS-1){
+        if constexpr (CUR_COL < OUTER_PRODUCT_COLS-1) {
+            if constexpr(IN_PLACE) {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC);
+            } else {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC, regD);
+            }
+        } else {
+            if constexpr(IN_PLACE) {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW+1,0>(regA, regB, regC);
+            } else {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,false,CUR_ROW+1,0>(regA, regB, regC, regD);
+            }
         }
     }
 }
 
+
 /**
- * @brief Tensor core matrix multiplication with source accumulation in buffer and intermediate write backs to buffer
+ * @brief Tensor core matrix multiplication with source accumulation begin zero and intermediate write backs going to tile buffer
  * */
-template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2,int USE_TILES = 1, int LOOP_IDX=0, const int tile=0 >
+template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2,int OUTER_PRODUCT_ROWS=1,int OUTER_PRODUCT_COLS = 1,  int CUR_ROW =0, int CUR_COL=0, const int tile=0 >
 inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB ) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
-    float* s_regA = regA;
-    float* s_regB = regB;
+    float* s_regA = regA + num_loads * CUR_ROW;
+    float* s_regB = regB + num_loads * CUR_COL;
+
     //static_assert(num_loads != 1, "For only one load use write back to register file");
 
     constexpr int wb_tile = tile;
     if constexpr (num_loads ==1) {
-        mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_BUF>(regA, regB,0,wb_tile); // loads zero by default
+        mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_BUF>(s_regA, s_regB,0,wb_tile); // loads zero by default
     } else {
-        mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_LOAD>(regA, regB); // loads zero by default
-        regA++;
-        regB++;
+        mat_mma<Accsrc_t::ACC_IMM, WriteBack_t::WB_LOAD>(s_regA, s_regB); // loads zero by default
+        s_regA++;
+        s_regB++;
 
 
         if constexpr(num_loads >2)  {
-            unrolled_for_func<0, num_loads-2>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB,0,0);
+            unrolled_for_func<0, num_loads-2>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &s_regA, &s_regB,0,0);
         }
-        mat_mma<Accsrc_t::ACC_NONE, WriteBack_t::WB_BUF>(regA, regB, 0,wb_tile);
+        mat_mma<Accsrc_t::ACC_NONE, WriteBack_t::WB_BUF>(s_regA, s_regB, 0,wb_tile);
     }
 
-    if constexpr (LOOP_IDX < USE_TILES-1) {
-        tc_mma_acc_zero_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1,wb_tile+1>(s_regA, s_regB+num_loads);
+    if constexpr(CUR_ROW < OUTER_PRODUCT_ROWS-1) {
+        if constexpr (CUR_COL < OUTER_PRODUCT_COLS-1) {
+            tc_mma_acc_zero_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW,CUR_COL+1,wb_tile+1>(regA, regB);
+        } else {
+            tc_mma_acc_zero_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW+1,0,wb_tile+1>(regA, regB);
+        }
     }
 }
 
@@ -267,20 +298,25 @@ inline void tc_mma_acc_zero_wb_buf(float* regA, float* regB ) {
  * used in conjunction with  tc_mma_acc_IMM_wb_buf
  * A reuse strategy
  * */
-template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int USE_TILES = 1, int LOOP_IDX=0, const int tile =0 >
+template <int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2,int OUTER_PRODUCT_ROWS=1,int OUTER_PRODUCT_COLS = 1,  int CUR_ROW =0, int CUR_COL=0, const int tile=0 >
 inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
-    float* s_regA = regA;
+    float* s_regA = regA + num_loads * CUR_ROW;
+    float* s_regB = regB + num_loads * CUR_COL;
     //static_assert(num_loads != 1, "For only one load use write back to register file");
     constexpr int acc_tile = tile;
     if constexpr(num_loads >1)  {
-        unrolled_for_func<0, num_loads-1>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &regA, &regB,0,0);
+        unrolled_for_func<0, num_loads-1>(mat_mma_unroll<Accsrc_t::ACC_NONE, WriteBack_t::WB_LOAD>, &s_regA, &s_regB,0,0);
     }
 
-    mat_mma<Accsrc_t::ACC_BUF, WriteBack_t::WB_BUF>(regA, regB, acc_tile,acc_tile); // in hw do it in the beginning
+    mat_mma<Accsrc_t::ACC_BUF, WriteBack_t::WB_BUF>(s_regA, s_regB, acc_tile,acc_tile); // in hw do it in the beginning
 
-    if constexpr (LOOP_IDX < USE_TILES-1) {
-        tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,USE_TILES,LOOP_IDX+1,acc_tile+1>(s_regA, ++regB);
+    if constexpr(CUR_ROW < OUTER_PRODUCT_ROWS-1) {
+        if constexpr (CUR_COL < OUTER_PRODUCT_COLS-1) {
+            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW,CUR_COL+1,wb_tile+1>(regA, ++regB);
+        } else {
+            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW+1,0,wb_tile+1>(regA, ++regB);
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 #define MAT_LOAD_HPP
 
 #include "mat_helper.hpp"
-#include <vx_print.h>
+//#include <vx_print.h>
 
 
 template<int COL, int KK, int NUM_COLS, int K,  typename T, int NEXT_COL_OFFSET=1>
@@ -46,9 +46,9 @@ inline constexpr void unrolled_load_row_col_major(T* col_ptr, T* registers,  int
     if constexpr (ROW < NUM_ROWS) {
         if constexpr (KK < K) {
             registers[ROW * K+ KK] = *(col_ptr+ KK*COL_STRIDE);
-            unrolled_load_row_col_major<ROW, KK+1, NUM_ROWS,K, T>( col_ptr,registers, COL_STRIDE);
+            unrolled_load_row_col_major<ROW, KK+1, NUM_ROWS,K, T, NEXT_ROW_OFFSET>( col_ptr,registers, COL_STRIDE);
         } else {
-            unrolled_load_row_col_major<ROW+1, 0, NUM_ROWS,K, T>( col_ptr+ NEXT_ROW_OFFSET,registers, COL_STRIDE);
+            unrolled_load_row_col_major<ROW+1, 0, NUM_ROWS,K, T, NEXT_ROW_OFFSET>( col_ptr+ NEXT_ROW_OFFSET,registers, COL_STRIDE);
         }
     }
 }
@@ -207,6 +207,7 @@ template <typename T, int OP_size, int Res_size,
     int TILE_COLS,  // output tile partitioning
     int NUM_PE_PER_GROUP,    // let's assume I know my thread_id beforehand
     int NUM_COLS=1,
+    int NUM_ROWS=1,
     layout_t layout = layout_t::COL_MAJOR
 >
 inline void tc_load_fragment_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, const int MAT_K) {

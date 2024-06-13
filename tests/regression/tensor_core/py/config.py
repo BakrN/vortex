@@ -22,7 +22,10 @@ parser.add_argument('--num_groups', type=int,  help='Number of pe groups', defau
 parser.add_argument('--operand_count', type=int, help='Number of operands (determined dot unit width FP16)', default=2)
 parser.add_argument('--input_mat_buf_depth', type=int, help='Depth of input matrix buffer', default=1)
 parser.add_argument('--output_fifo_size', type=int, help='Size of output FIFO', default=1)
-parser.add_argument('--num_acc_tiles', type=int, help='Number of accumulator tiles', default=0)
+parser.add_argument('--outer_product_cols', type=int, help='Size of of accumulator tile (COLS)', default=1)
+parser.add_argument('--outer_product_rows', type=int, help='Number of accumulator tile (ROWS)', default=1)
+parser.add_argument('--use_tiles', type=int, help='Number of accumulator tile (ROWS)', default=0)
+
 parser.add_argument('--num_dot_units', type=int, help='Number of dot units per PE', default=1)
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
@@ -120,9 +123,13 @@ class TCConfig:
     operand_count = 0
     input_mat_buf_depth = 0
     output_fifo_size = 0
-    num_acc_tiles = 0
+
+    outer_product_cols = 0
+    outer_product_rows = 0
+
     execution_latency = 0
     num_dot_units = 1
+    use_tiles = 0
     def Dnum_pes(self):
         return f"-DTC_NUM_PES={self.num_pes}"
     def Dnum_groups(self):
@@ -135,12 +142,16 @@ class TCConfig:
         return f"-DTC_MAT_BUF_DEPTH={self.input_mat_buf_depth}"
     def Doutput_fifo_size(self):
         return f"-DTC_OUTPUT_FIFO_SIZE={self.output_fifo_size}"
-    def Dnum_acc_tiles(self):
-        return f"-DTC_NUM_ACC_TILES={self.num_acc_tiles}"
+    def Douter_product_cols(self):
+        return f"-DTC_OUTER_PRODUCT_COLS={self.outer_product_cols}"
+    def Douter_product_rows(self):
+        return f"-DTC_OUTER_PRODUCT_ROWS={self.outer_product_rows}"
     def Dnum_dot_units(self):
         return f"-DTC_NUM_DOT_UNITS={self.num_dot_units}"
+    def Duse_tiles(self):
+        return f"-DTC_USE_TILES"
     def getdef(self):
-        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Dnum_acc_tiles()} {self.Dnum_dot_units()}"
+        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Douter_product_cols()} {self.Douter_product_rows()} {self.Dnum_dot_units()} {self.Duse_tiles() if self.use_tiles else ''}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -153,7 +164,10 @@ tc.num_groups = args["num_groups"]
 tc.operand_count = args["operand_count"]
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
-tc.num_acc_tiles = args["num_acc_tiles"]
+tc.outer_product_cols = args["outer_product_cols"]
+tc.outer_product_rows = args["outer_product_rows"]
+assert (tc.outer_product_cols >= 1 and tc.outer_product_rows >= 1), "Outer product dimensions must be greater than 0")
+tc.use_tiles = args["use_tiles"]
 tc.execution_latency = 1
 tc.num_dot_units = args["num_dot_units"]
 
@@ -183,8 +197,8 @@ class GEMMArgs:
 
 system = GEMMArgs()
 # Assume M == N, no Acc tiles for now
-system.otile_row = tc.num_pes
-system.otile_col = tc.num_pes * (tc.num_acc_tiles if tc.num_acc_tiles else 1)
+system.otile_row = tc.num_pes * tc.outer_product_rows
+system.otile_col = tc.num_pes * tc.outer_product_cols
 
 # Need a better way to divide the groups (especially with more accumualtion tiles)
 # define a way to partition to n and m

@@ -22,11 +22,38 @@
 
 
 
-#if (TC_NUM_ACC_TILES > 0)
-#define TILE_ACC_STRATEGY
-#endif
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
+
+
+enum class MatT{
+    A,
+    B,
+    C,
+    D
+};
+
+template <MatT>
+struct tc_tile ;
+
+template <>
+struct tc_tile<MatT::A> {
+    static (void)(*load_fragment)((float* , float* , int , int , int ) = tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS>;
+}
+template <>
+struct tc_tile<MatT::B> {
+    static (void)(*load_fragment)(float*, float*,int, int ,int) = tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_COLS>;
+}
+
+template <>
+struct tc_tile<MatT::C> {
+    static (void)(*load_fragment)(float* , float* , int , int , int ) =  tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_COLS, TC_OUTER_PRODUCT_ROWS>;
+}
+
+
+template <MatT T>
+using load_fragment = tc_tile<T>::load_fragment;
+
 
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
@@ -84,9 +111,9 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float* C_ptr = C_start;
    float* D_ptr = D_start;
 
-   float regA[tc_k * PREC_RATIO];
-   float regB[tc_k * PREC_RATIO * ((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1)];
-   float regC[OTILE_COL] = {0}; // this should be equal to tc_n
+   float regA[tc_k * PREC_RATIO * TC_OUTER_PRODUCT_ROWS ];
+   float regB[tc_k * PREC_RATIO * TC_OUTER_PRODUCT_COLS ];
+   float regC[OTILE_ROW* OTILE_COL] = {0}; // this should be equal to tc_n
 
    // Main GEMM (simple 1 warp impl)
    for (int i = 0; i < tileSizeRow; i+=tc_m) {
@@ -97,32 +124,31 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
 
-           #ifdef TILE_ACC_STRATEGY
-           tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
-           tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
+           #ifdef TC_USE_TILES
+           load_fragment<MatT::A>(A_ptr, regA, thread_id, MAT_M, MAT_K);
+           load_fragment<MatT::B>(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
-           tc_mma_acc_zero_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB);
+           tc_mma_acc_zero_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_OUTER_PRODUCT_COLS>((float*)regA, (float*)regB);
            A_ptr+=tc_k * PREC_RATIO; // assuming row major
            B_ptr+=tc_k * PREC_RATIO; // assumming col_major
 
            for (int k = tc_k ; k < MAT_K; k+=tc_k){
            #else
-           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
+           load_fragment<MatT::C>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            for (int k = 0 ; k < MAT_K; k+=tc_k){
            #endif
 
-               tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(A_ptr, regA, thread_id, MAT_M, MAT_K);
+               load_fragment<MatT::A>(A_ptr, regA, thread_id, MAT_M, MAT_K);
 
-               tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,((TC_NUM_ACC_TILES > 0) ? TC_NUM_ACC_TILES : 1) >(B_ptr, regB, thread_id, MAT_N, MAT_K);
-
-
+               load_fragment<MatT::B>(B_ptr, regB, thread_id, MAT_N, MAT_K);
 
 
-               #ifdef TILE_ACC_STRATEGY
+
+               #ifdef TC_USE_TILES
                    // acc tile (unroll for N times acc tiles)
                    // repeat this NUM Tile times
                    //
-                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_NUM_ACC_TILES>((float*)regA, (float*)regB) ;
+                   tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_OUTER_PRODUCT_COLS>((float*)regA, (float*)regB) ;
                #else
                    #ifdef DEBUG
 
@@ -150,7 +176,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                    }
 
                    #endif
-                   tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,true>((float*)regA, (float*)regB, (float*)regC);
+                   tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,TC_OUTER_PRODUCT_COLS,TC_OUTER_PRODUCT_ROWS,true>((float*)regA, (float*)regB, (float*)regC);
                #endif
 
 
@@ -166,12 +192,12 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * PREC_RATIO; // assumming col_major
            }
-           #ifdef TILE_ACC_STRATEGY
+           #ifdef TC_USE_TILES
            // flush tc results for each used tiles
            // Do (initial C) accumulation
-           tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES>(C_ptr, regC, thread_id, MAT_M, MAT_N);
-           float regD[OTILE_COL] = {0};
-           tc_flush_tiles<float, TC_NUM_PES, TC_NUM_ACC_TILES> ((float*)(regD)) ;
+           load_fragment<MatT::C>(C_ptr, regC, thread_id, MAT_M, MAT_N);
+           float regD[OTILE_ROW* OTILE_COL] = {0};
+           tc_flush_tiles<float, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS,TC_OUTER_PRODUCT_COLS > ((float*)(regD)) ;
 
            // Treat the float as an unsigned 32-bit integer
            float* regD_ptr = (float*)(regD);
@@ -180,9 +206,9 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            unrolled_for_func<0,OTILE_COL>(fadd_regs, &regD_ptr, &regC_ptr);
 
            // store
-           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regD, (float*)D_ptr, thread_id, MAT_N);
+           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regD, (float*)D_ptr, thread_id, MAT_M, MAT_N);
            #else
-           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regC, (float*)D_ptr, thread_id, MAT_N);
+           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regC, (float*)D_ptr, thread_id, MAT_M, MAT_N);
            #endif
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR

@@ -97,3 +97,4 @@ compile_commands.json
 .cache/*
 *.s
 *ramulator*.log
+*stat*.txt
