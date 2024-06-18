@@ -213,12 +213,11 @@ class AccBuffer { // Accumulator buffer
             m_head.resize(m_rows);
             m_tail.resize(m_rows);
             for (size_t i = 0 ; i < m_rows; i++){
-                m_locked[i].resize(m_cols,0);
                 m_data[i].resize(m_cols);
-                m_head[i].resize(m_cols,0);
-                m_tail[i].resize(m_cols,0);
-
-                for (size_t j = 0 ; j < m_rows; j++) {
+                for (size_t j = 0 ; j < m_cols; j++) {
+                    m_head[i].push_back(0) ;
+                    m_tail[i].push_back(0);
+                    m_locked[i].push_back(0);
                     m_data[i][j].resize(m_shifter_width, 0);
                 }
             }

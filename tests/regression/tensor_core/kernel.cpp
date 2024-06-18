@@ -26,7 +26,7 @@
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 
 
-enum class MatT{
+enum class MatT {
     A,
     B,
     C,
@@ -36,23 +36,19 @@ enum class MatT{
 template <MatT>
 struct tc_tile ;
 
-template <>
-struct tc_tile<MatT::A> {
-    static (void)(*load_fragment)((float* , float* , int , int , int ) = tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS>;
-}
-template <>
-struct tc_tile<MatT::B> {
-    static (void)(*load_fragment)(float*, float*,int, int ,int) = tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_COLS>;
-}
 
-template <>
-struct tc_tile<MatT::C> {
-    static (void)(*load_fragment)(float* , float* , int , int , int ) =  tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_COLS, TC_OUTER_PRODUCT_ROWS>;
+template<MatT T >
+inline void load_fragment(float* ptr , float*reg , int tid, int dim0,int dim1){
+    if constexpr(T == MatT::A) {
+        tc_load_fragment_a<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS>(ptr, reg, tid, dim0, dim1) ;
+    } else {
+        if constexpr(T == MatT::B) {
+            tc_load_fragment_b<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_COLS>(ptr,reg,tid, dim0,dim1);
+        }  else {
+            tc_load_fragment_c<float,TC_OP_SIZE, TC_RES_SIZE, tc_n, tc_k, OTILE_ROW, OTILE_COL, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS>(ptr,reg,tid, dim0,dim1) ;
+        }
+    }
 }
-
-
-template <MatT T>
-using load_fragment = tc_tile<T>::load_fragment;
 
 
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
@@ -113,7 +109,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    float regA[tc_k * PREC_RATIO * TC_OUTER_PRODUCT_ROWS ];
    float regB[tc_k * PREC_RATIO * TC_OUTER_PRODUCT_COLS ];
-   float regC[OTILE_ROW* OTILE_COL] = {0}; // this should be equal to tc_n
+   float regC[TC_OUTER_PRODUCT_ROWS* OTILE_COL] = {0}; // this should be equal to tc_n
 
    // Main GEMM (simple 1 warp impl)
    for (int i = 0; i < tileSizeRow; i+=tc_m) {
@@ -150,33 +146,35 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                    //
                    tc_mma_acc_buf_wb_buf<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE, TC_OUTER_PRODUCT_COLS>((float*)regA, (float*)regB) ;
                #else
-                   #ifdef DEBUG
+                   //#ifdef DEBUG
 
-                   vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
-                       uint32_t* val = (uint32_t*)(&regA[idx]);
-                       uint16_t _first = (uint16_t)(*val >> 16);
-                       uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                       float16 first(_first) ;
-                       float16 second(_second);
-                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
-                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   //vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
+                   //for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
+                   //    uint32_t* val = (uint32_t*)(&regA[idx]);
+                   //    uint16_t _first = (uint16_t)(*val >> 16);
+                   //    uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                   //    float16 first(_first) ;
+                   //    float16 second(_second);
+                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
+                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
 
-                       val = (uint32_t*)(&regB[idx]);
-                       _first = (uint16_t)(*val >> 16);
-                       _second = (uint16_t)(*val & 0xFFFF);
-                       first = float16(_first);
-                       second = float16(_second);
-                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
-                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
-                   }
-                   for (int idx = 0 ; idx < OTILE_COL; idx++) {
-                       //print regC
-                       vx_printf("(%d) regC[%d] = %f\n", thread_id, idx, regC[idx]);
-                   }
+                   //    val = (uint32_t*)(&regB[idx]);
+                   //    _first = (uint16_t)(*val >> 16);
+                   //    _second = (uint16_t)(*val & 0xFFFF);
+                   //    first = float16(_first);
+                   //    second = float16(_second);
+                   //    vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
+                   //    vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   //}
+                   //for (int i = 0 ; i < TC_OUTER_PRODUCT_ROWS; i++) {
+                   //    //print regC
+                   //    for (int j = 0 ; j < OTILE_COL; j++) {
+                   //        vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*OTILE_COL + j]);
+                   //    }
+                   //}
 
-                   #endif
-                   tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,TC_OUTER_PRODUCT_COLS,TC_OUTER_PRODUCT_ROWS,true>((float*)regA, (float*)regB, (float*)regC);
+                   //#endif
+                   tc_mma_acc_reg_wb_reg<TC_OP_COUNT, TC_NUM_PES, TC_RES_SIZE, TC_OP_SIZE,TC_OUTER_PRODUCT_ROWS,TC_OUTER_PRODUCT_COLS,true>((float*)regA, (float*)regB, (float*)regC);
                #endif
 
 
@@ -196,7 +194,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            // flush tc results for each used tiles
            // Do (initial C) accumulation
            load_fragment<MatT::C>(C_ptr, regC, thread_id, MAT_M, MAT_N);
-           float regD[OTILE_ROW* OTILE_COL] = {0};
+           float regD[TC_OUTER_PRODUCT_ROWS* OTILE_COL] = {0};
            tc_flush_tiles<float, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS,TC_OUTER_PRODUCT_COLS > ((float*)(regD)) ;
 
            // Treat the float as an unsigned 32-bit integer
@@ -206,9 +204,9 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            unrolled_for_func<0,OTILE_COL>(fadd_regs, &regD_ptr, &regC_ptr);
 
            // store
-           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regD, (float*)D_ptr, thread_id, MAT_M, MAT_N);
+           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES, TC_OUTER_PRODUCT_ROWS>((float*)regD, (float*)D_ptr, thread_id, MAT_M, MAT_N);
            #else
-           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES>((float*)regC, (float*)D_ptr, thread_id, MAT_M, MAT_N);
+           tc_store<float, tc_n, OTILE_ROW, OTILE_COL, TC_NUM_PES,TC_OUTER_PRODUCT_ROWS>((float*)regC, (float*)D_ptr, thread_id, MAT_M, MAT_N);
            #endif
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR

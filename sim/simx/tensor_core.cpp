@@ -275,7 +275,9 @@ bool TensorCore::compute(){
             // otherwise process new loaded row
             else if (m_pe_groups[grp].isReadyToFire(wid) ){
                 if constexpr (!FUNC_ONLY) {
-                    stat_alu_util->addValue((m_config.operand_count+1)/2 ) ;  // add num of loads
+                    if (grp ==0) {
+                        stat_alu_util->addValue((m_config.operand_count+1)/2 ) ;  // add num of loads
+                    }
                 }
                 fired = true;
                 //m_core->issued_ins

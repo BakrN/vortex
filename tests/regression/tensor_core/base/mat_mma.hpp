@@ -205,17 +205,17 @@ inline void mat_mma_unroll (float** regA, float** regB,  typename AccsrcSelector
 /**
  * @brief Tensor core matrix multiplication with accumulation in register file and write back to register file
  * */
-template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int OUTER_PRODUCT_COLS, int OUTER_PRODUCT_ROWS, bool IN_PLACE =true, /*For loop unroll management*/ int CUR_ROW=0, int CUR_COL=0>
+template<int DOT_WIDTH, int STEPS, int RES_TYPE_SIZE = 4,int OP_TYPE_SIZE= 2, int OUTER_PRODUCT_ROWS, int OUTER_PRODUCT_COLS, bool IN_PLACE =true, /*For loop unroll management*/ int CUR_ROW=0, int CUR_COL=0>
 inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float* regD=nullptr) {
     constexpr int num_loads = DOT_WIDTH / (RES_TYPE_SIZE/OP_TYPE_SIZE);
     static_assert(num_loads >= STEPS, "Steps cannot be larger than number of loads when using register file as accumulator. Because if steps is more that means my C register per PE is not entirely filled");
     // if it's equal to 1 then just store back directly
     float* s_regA = regA + num_loads * CUR_ROW;
     float* s_regB = regB + num_loads * CUR_COL;
-    float* s_regC = regC + STEPS * CUR_ROW + CUR_COL;
+    float* s_regC = regC + OUTER_PRODUCT_COLS*STEPS* CUR_ROW + CUR_COL*STEPS;
     float* s_regD = regD ;
     if constexpr (!IN_PLACE) {
-        s_regD = regD + STEPS * CUR_ROW + CUR_COL;
+        s_regD = regD + OUTER_PRODUCT_COLS*STEPS* CUR_ROW + CUR_COL*STEPS;
     }
     if constexpr(num_loads == 1) {
         static_assert(STEPS == 1, "");
@@ -244,15 +244,24 @@ inline void tc_mma_acc_reg_wb_reg(float* regA , float* regB , float* regC, float
     if constexpr(CUR_ROW < OUTER_PRODUCT_ROWS-1){
         if constexpr (CUR_COL < OUTER_PRODUCT_COLS-1) {
             if constexpr(IN_PLACE) {
-                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC);
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC);
             } else {
-                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC, regD);
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,false,CUR_ROW,CUR_COL+1>(regA, regB, regC, regD);
             }
         } else {
             if constexpr(IN_PLACE) {
-                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,true,CUR_ROW+1,0>(regA, regB, regC);
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,true,CUR_ROW+1,0>(regA, regB, regC);
             } else {
-                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_COLS,OUTER_PRODUCT_ROWS,false,CUR_ROW+1,0>(regA, regB, regC, regD);
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,false,CUR_ROW+1,0>(regA, regB, regC, regD);
+            }
+        }
+    } else {
+        // just columns left
+        if constexpr (CUR_ROW==OUTER_PRODUCT_ROWS-1 && CUR_COL < OUTER_PRODUCT_COLS-1) {
+            if constexpr(IN_PLACE) {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,true,CUR_ROW,CUR_COL+1>(regA, regB, regC);
+            } else {
+                tc_mma_acc_reg_wb_reg<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,false,CUR_ROW,CUR_COL+1>(regA, regB, regC, regD);
             }
         }
     }
@@ -313,9 +322,9 @@ inline void tc_mma_acc_buf_wb_buf(float* regA, float* regB) {
 
     if constexpr(CUR_ROW < OUTER_PRODUCT_ROWS-1) {
         if constexpr (CUR_COL < OUTER_PRODUCT_COLS-1) {
-            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW,CUR_COL+1,wb_tile+1>(regA, ++regB);
+            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW,CUR_COL+1,acc_tile+1>(regA, ++regB);
         } else {
-            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW+1,0,wb_tile+1>(regA, ++regB);
+            tc_mma_acc_buf_wb_buf<DOT_WIDTH, STEPS, RES_TYPE_SIZE,OP_TYPE_SIZE,OUTER_PRODUCT_ROWS,OUTER_PRODUCT_COLS,CUR_ROW+1,0,acc_tile+1>(regA, ++regB);
         }
     }
 }

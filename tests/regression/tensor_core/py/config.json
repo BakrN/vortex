@@ -1,7 +1,7 @@
 {
     "M": 256,
-    "N": 256,
     "K": 256,
+    "N": 256,
     "op_type": "fp16",
     "res_type": "fp32",
     "a_orientation": "row_major",
@@ -12,12 +12,15 @@
     "num_warps": 8,
     "num_clusters": 1,
     "num_cores": 1,
-    "num_groups": 1,
+    "num_groups": 2,
     "num_dot_units": 1,
-    "operand_count": 16,
+    "operand_count": 8,
     "input_mat_buf_depth": 1,
-    "output_fifo_size": 1,
-    "num_acc_tiles": 2,
+    "output_fifo_size": 2,
+    "outer_product_rows": 2,
+    "outer_product_cols": 2,
+    "warp_tiles" : 1,
+    "use_tiles" : 0,
     "define_file": "defines.txt"
 }
 

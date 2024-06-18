@@ -1,6 +1,5 @@
 import numpy as np
 import argparse
-import math
 import json
 parser = argparse.ArgumentParser(description='Configure vortex with simx simulation')
 parser.add_argument('--config', type=str, default="", help='Config file')
@@ -25,6 +24,7 @@ parser.add_argument('--output_fifo_size', type=int, help='Size of output FIFO', 
 parser.add_argument('--outer_product_cols', type=int, help='Size of of accumulator tile (COLS)', default=1)
 parser.add_argument('--outer_product_rows', type=int, help='Number of accumulator tile (ROWS)', default=1)
 parser.add_argument('--use_tiles', type=int, help='Number of accumulator tile (ROWS)', default=0)
+parser.add_argument('--warp_tiles', type=int, help='Number of accumulator tile (ROWS)', default=0)
 
 parser.add_argument('--num_dot_units', type=int, help='Number of dot units per PE', default=1)
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
@@ -129,6 +129,7 @@ class TCConfig:
 
     execution_latency = 0
     num_dot_units = 1
+    warp_tiles = 2
     use_tiles = 0
     def Dnum_pes(self):
         return f"-DTC_NUM_PES={self.num_pes}"
@@ -150,8 +151,10 @@ class TCConfig:
         return f"-DTC_NUM_DOT_UNITS={self.num_dot_units}"
     def Duse_tiles(self):
         return f"-DTC_USE_TILES"
+    def Dwarp_tiles(self):
+        return f"-DTC_WARP_TILES={self.warp_tiles}"
     def getdef(self):
-        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Douter_product_cols()} {self.Douter_product_rows()} {self.Dnum_dot_units()} {self.Duse_tiles() if self.use_tiles else ''}"
+        return f"{self.Dnum_pes()} {self.Dnum_groups()} {self.Dexec_latency()} {self.Doperand_count()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Douter_product_cols()} {self.Douter_product_rows()} {self.Dnum_dot_units()} {self.Duse_tiles() if self.use_tiles else ''} {self.Dwarp_tiles()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -166,8 +169,9 @@ tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
 tc.outer_product_cols = args["outer_product_cols"]
 tc.outer_product_rows = args["outer_product_rows"]
-assert (tc.outer_product_cols >= 1 and tc.outer_product_rows >= 1), "Outer product dimensions must be greater than 0")
+assert ((tc.outer_product_cols >= 1 and tc.outer_product_rows >= 1), "Outer product dimensions must be greater than 0")
 tc.use_tiles = args["use_tiles"]
+tc.warp_tiles = args["warp_tiles"]
 tc.execution_latency = 1
 tc.num_dot_units = args["num_dot_units"]
 
@@ -197,8 +201,8 @@ class GEMMArgs:
 
 system = GEMMArgs()
 # Assume M == N, no Acc tiles for now
-system.otile_row = tc.num_pes * tc.outer_product_rows
-system.otile_col = tc.num_pes * tc.outer_product_cols
+system.otile_row = tc.num_pes * tc.outer_product_rows # Number of rows per pe group
+system.otile_col = tc.num_pes * tc.outer_product_cols # Number of cols per pe group
 
 # Need a better way to divide the groups (especially with more accumualtion tiles)
 # define a way to partition to n and m

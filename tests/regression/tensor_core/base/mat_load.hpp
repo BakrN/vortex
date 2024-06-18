@@ -161,13 +161,13 @@ inline void tc_load_fragment_c(T* ptr, T* reg, const int thread_id, const int MA
         auto c_row_offset = MAT_N*(row_group * TILE_ROWS + (thread_id % NUM_PE_PER_GROUP));
         auto c_col_offset = col_group*TILE_COLS;
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
-        unrolled_load_row_row_major<0, 0,NUM_ROWS,TILE_COLS,  T>(c_row_ptr, reg, MAT_M);
+        unrolled_load_row_row_major<0, 0,NUM_ROWS,TILE_COLS,  T, NUM_PE_PER_GROUP>(c_row_ptr, reg, MAT_N);
     } else {
         //vx_printf("(%d) C(cm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
         auto c_row_offset = row_group * TILE_ROWS + (thread_id % NUM_PE_PER_GROUP);
         auto c_col_offset = MAT_M*(col_group*TILE_COLS);
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
-        unrolled_load_row_col_major<0, 0,NUM_ROWS,TILE_COLS,  T>(c_row_ptr, reg, MAT_N);
+        unrolled_load_row_col_major<0, 0,NUM_ROWS,TILE_COLS,  T, NUM_PE_PER_GROUP>(c_row_ptr, reg, MAT_M);
     }
 
 }  // load a and b
@@ -185,7 +185,7 @@ inline void tc_load_fragment_a(T* ptr, T* reg , const int thread_id, const int M
     const int pe_group_id = thread_id  / NUM_PE_PER_GROUP; // number of pes
     const int row_group = pe_group_id / (col_groups); // determines HW config
     if constexpr (layout == layout_t::ROW_MAJOR) {
-        auto row_offset = MAT_K*(row_group * TILE_ROWS + (thread_id % NUM_PE_PER_GROUP))*OP_size/Res_size;
+        auto row_offset = MAT_K*(row_group * TILE_ROWS  + (thread_id % NUM_PE_PER_GROUP))*OP_size/Res_size;
         //vx_printf("(%d) A(rm) row offset= %d\n", thread_id,  row_offset);
         T* a_row_ptr = ptr + row_offset;
         //vx_printf("(%d) row_ptr = %d\n", thread_id,  A - a_row_ptr);
