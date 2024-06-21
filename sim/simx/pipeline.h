@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -50,14 +50,18 @@ public:
   //--
   const uint64_t uuid;
   const Arch&    arch;
-  
+
   //--
   uint32_t    cid;
-  uint32_t    wid;  
+  uint32_t    wid;
   ThreadMask  tmask;
   Word        PC;
 
   //--
+  uint32_t    rsrc1=-1;
+  uint32_t    rsrc2=-1;
+  uint32_t    rsrc3=-1;
+  uint32_t    imm = -1;
   uint32_t    rdest;
   RegType     rdest_type;
   bool        wb;
@@ -67,8 +71,8 @@ public:
   RegMask     used_fregs;
   RegMask     used_vregs;
 
-  //- 
-  ExeType     exe_type; 
+  //-
+  ExeType     exe_type;
 
   //--
   union {
@@ -77,6 +81,7 @@ public:
     AluType  alu_type;
     FpuType  fpu_type;
     SfuType  sfu_type;
+    TCOpType  tc_type;
   };
 
   ITraceData::Ptr data;
@@ -87,13 +92,13 @@ public:
 
   bool fetch_stall;
 
-  pipeline_trace_t(uint64_t uuid, const Arch& arch) 
+  pipeline_trace_t(uint64_t uuid, const Arch& arch)
     : uuid(uuid)
     , arch(arch)
     , cid(0)
     , wid(0)
     , tmask(0)
-    , PC(0)    
+    , PC(0)
     , rdest(0)
     , rdest_type(RegType::None)
     , wb(false)
@@ -107,19 +112,22 @@ public:
     , sop(true)
     , eop(true)
     , fetch_stall(false)
-    , log_once_(false) 
+    , log_once_(false)
   {}
 
-  pipeline_trace_t(const pipeline_trace_t& rhs) 
+  pipeline_trace_t(const pipeline_trace_t& rhs)
     : uuid(rhs.uuid)
     , arch(rhs.arch)
     , cid(rhs.cid)
     , wid(rhs.wid)
     , tmask(rhs.tmask)
-    , PC(rhs.PC)    
+    , PC(rhs.PC)
+    , rsrc1(rhs.rsrc1)
+    , rsrc2(rhs.rsrc2)
+    , rsrc3(rhs.rsrc3)
     , rdest(rhs.rdest)
     , rdest_type(rhs.rdest_type)
-    , wb(rhs.wb)    
+    , wb(rhs.wb)
     , used_iregs(rhs.used_iregs)
     , used_fregs(rhs.used_fregs)
     , used_vregs(rhs.used_vregs)
@@ -130,9 +138,10 @@ public:
     , sop(rhs.sop)
     , eop(rhs.eop)
     , fetch_stall(rhs.fetch_stall)
-    , log_once_(false) 
+    , log_once_(false)
+
   {}
-  
+
   ~pipeline_trace_t() {}
 
   bool log_once(bool enable) {
@@ -149,9 +158,10 @@ inline std::ostream &operator<<(std::ostream &os, const pipeline_trace_t& state)
   os << "cid=" << state.cid;
   os << ", wid=" << state.wid;
   os << ", tmask=";
+  std::cout << state.arch.num_threads() << std::endl;
   for (uint32_t i = 0, n = state.arch.num_threads(); i < n; ++i) {
       os << state.tmask.test(i);
-  }  
+  }
   os << ", PC=0x" << std::hex << state.PC;
   os << ", wb=" << state.wb;
   if (state.wb) {
@@ -169,10 +179,10 @@ inline std::ostream &operator<<(std::ostream &os, const pipeline_trace_t& state)
 
 class PipelineLatch {
 public:
-  PipelineLatch(const char* name = nullptr) 
-    : name_(name) 
+  PipelineLatch(const char* name = nullptr)
+    : name_(name)
   {}
-  
+
   bool empty() const {
     return queue_.empty();
   }
@@ -185,7 +195,7 @@ public:
     return queue_.back();
   }
 
-  void push(pipeline_trace_t* value) {    
+  void push(pipeline_trace_t* value) {
     queue_.push(value);
   }
 

@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,16 +42,18 @@ static const std::unordered_map<Opcode, InstType> sc_instTable = {
   {Opcode::AMO,        InstType::R_TYPE},
   {Opcode::FL,         InstType::I_TYPE},
   {Opcode::FS,         InstType::S_TYPE},
-  {Opcode::FCI,        InstType::R_TYPE}, 
+  {Opcode::FCI,        InstType::R_TYPE},
   {Opcode::FMADD,      InstType::R4_TYPE},
   {Opcode::FMSUB,      InstType::R4_TYPE},
   {Opcode::FMNMADD,    InstType::R4_TYPE},
-  {Opcode::FMNMSUB,    InstType::R4_TYPE},  
+  {Opcode::FMNMSUB,    InstType::R4_TYPE},
   {Opcode::VSET,       InstType::V_TYPE},
   {Opcode::EXT1,       InstType::R_TYPE},
   {Opcode::EXT2,       InstType::R4_TYPE},
   {Opcode::R_INST_W,   InstType::R_TYPE},
   {Opcode::I_INST_W,   InstType::I_TYPE},
+  {Opcode::HMMA,       InstType::R4_TYPE},
+  {Opcode::TC_FLUSH,       InstType::I_TYPE}
 };
 
 enum Constants {
@@ -82,7 +84,7 @@ enum Constants {
   shift_func6 = shift_func7 + width_vmask,
   shift_vset  = shift_func7 + width_func6,
 
-  mask_opcode = (1 << width_opcode) - 1,  
+  mask_opcode = (1 << width_opcode) - 1,
   mask_reg    = (1 << width_reg)   - 1,
   mask_func2  = (1 << width_func2) - 1,
   mask_func3  = (1 << width_func3) - 1,
@@ -144,7 +146,7 @@ static const char* op_string(const Instr &instr) {
     case 7: return "ANDI";
     default:
       std::abort();
-    }  
+    }
   case Opcode::B_INST:
     switch (func3) {
     case 0: return "BEQ";
@@ -194,7 +196,7 @@ static const char* op_string(const Instr &instr) {
       switch (func3) {
       case 0: return func7 ? "SUBW" : "ADDW";
       case 1: return "SLLW";
-      case 5: return func7 ? "SRAW" : "SRLW";  
+      case 5: return func7 ? "SRAW" : "SRLW";
       default:
         std::abort();
       }
@@ -207,7 +209,7 @@ static const char* op_string(const Instr &instr) {
     default:
       std::abort();
     }
-  case Opcode::SYS_INST: 
+  case Opcode::SYS_INST:
     switch (func3) {
     case 0:
       switch (imm) {
@@ -217,7 +219,7 @@ static const char* op_string(const Instr &instr) {
       case 0x102: return "SRET";
       case 0x302: return "MRET";
       default:
-        std::abort();      
+        std::abort();
       }
     case 1: return "CSRRW";
     case 2: return "CSRRS";
@@ -229,20 +231,20 @@ static const char* op_string(const Instr &instr) {
       std::abort();
     }
   case Opcode::FENCE: return "FENCE";
-  case Opcode::FL: 
+  case Opcode::FL:
     switch (func3) {
     case 0x1: return "VL";
     case 0x2: return "FLW";
     case 0x3: return "FLD";
-    default: 
+    default:
       std::abort();
     }
-  case Opcode::FS: 
+  case Opcode::FS:
     switch (func3) {
     case 0x1: return "VS";
     case 0x2: return "FSW";
     case 0x3: return "FSD";
-    default: 
+    default:
       std::abort();
     }
   case Opcode::AMO: {
@@ -280,11 +282,11 @@ static const char* op_string(const Instr &instr) {
         default:
           std::abort();
         }
-      default: 
+      default:
         std::abort();
     }
   }
-  case Opcode::FCI: 
+  case Opcode::FCI:
     switch (func7) {
     case 0x00: return "FADD.S";
     case 0x01: return "FADD.D";
@@ -297,7 +299,7 @@ static const char* op_string(const Instr &instr) {
     case 0x2c: return "FSQRT.S";
     case 0x2d: return "FSQRT.D";
     case 0x10:
-      switch (func3) {            
+      switch (func3) {
       case 0: return "FSGNJ.S";
       case 1: return "FSGNJN.S";
       case 2: return "FSGNJX.S";
@@ -305,7 +307,7 @@ static const char* op_string(const Instr &instr) {
         std::abort();
       }
     case 0x11:
-      switch (func3) {            
+      switch (func3) {
       case 0: return "FSGNJ.D";
       case 1: return "FSGNJN.D";
       case 2: return "FSGNJX.D";
@@ -313,14 +315,14 @@ static const char* op_string(const Instr &instr) {
         std::abort();
       }
     case 0x14:
-      switch (func3) {            
+      switch (func3) {
       case 0: return "FMIN.S";
       case 1: return "FMAX.S";
       default:
         std::abort();
       }
     case 0x15:
-      switch (func3) {            
+      switch (func3) {
       case 0: return "FMIN.D";
       case 1: return "FMAX.D";
       default:
@@ -328,23 +330,23 @@ static const char* op_string(const Instr &instr) {
       }
     case 0x20: return "FCVT.S.D";
     case 0x21: return "FCVT.D.S";
-    case 0x50: 
-      switch (func3) {              
-      case 0: return "FLE.S"; 
-      case 1: return "FLT.S"; 
+    case 0x50:
+      switch (func3) {
+      case 0: return "FLE.S";
+      case 1: return "FLT.S";
       case 2: return "FEQ.S";
       default:
         std::abort();
       }
-    case 0x51: 
-      switch (func3) {              
-      case 0: return "FLE.D"; 
-      case 1: return "FLT.D"; 
+    case 0x51:
+      switch (func3) {
+      case 0: return "FLE.D";
+      case 1: return "FLT.D";
       case 2: return "FEQ.D";
       default:
         std::abort();
       }
-    case 0x60: 
+    case 0x60:
       switch (rs2) {
       case 0: return "FCVT.W.S";
       case 1: return "FCVT.WU.S";
@@ -362,7 +364,7 @@ static const char* op_string(const Instr &instr) {
       default:
         std::abort();
       }
-    case 0x68: 
+    case 0x68:
       switch (rs2) {
       case 0: return "FCVT.S.W";
       case 1: return "FCVT.S.WU";
@@ -395,7 +397,7 @@ static const char* op_string(const Instr &instr) {
   case Opcode::EXT1:
     switch (func7) {
     case 0:
-      switch (func3) {            
+      switch (func3) {
       case 0: return "TMC";
       case 1: return "WSPAWN";
       case 2: return "SPLIT";
@@ -412,7 +414,7 @@ static const char* op_string(const Instr &instr) {
     switch (func3) {
     case 1: {
       switch (func2) {
-      case 0: return "CMOV"; 
+      case 0: return "CMOV";
       default:
         std::abort();
       }
@@ -420,24 +422,27 @@ static const char* op_string(const Instr &instr) {
     default:
       std::abort();
     }
+  case Opcode::HMMA: {
+    return "HMMA" ;
+  }
   default:
     std::abort();
   }
 }
 
 namespace vortex {
-std::ostream &operator<<(std::ostream &os, const Instr &instr) {  
+std::ostream &operator<<(std::ostream &os, const Instr &instr) {
   auto opcode = instr.getOpcode();
   auto func3  = instr.getFunc3();
 
   os << op_string(instr);
-  
+
   int sep = 0;
   if (instr.getRDType() != RegType::None) {
     if (sep++ != 0) { os << ", "; } else { os << " "; }
     os << instr.getRDType() << std::dec << instr.getRDest();
   }
-  for (uint32_t i = 0; i < instr.getNRSrc(); ++i) {    
+  for (uint32_t i = 0; i < instr.getNRSrc(); ++i) {
     if (instr.getRSType(i) == RegType::None)
       continue;
     if (sep++ != 0) { os << ", "; } else { os << " "; }
@@ -458,7 +463,7 @@ std::ostream &operator<<(std::ostream &os, const Instr &instr) {
 
 Decoder::Decoder(const Arch&) {}
 
-std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {  
+std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
   auto instr = std::make_shared<Instr>();
   auto op = Opcode((code >> shift_opcode) & mask_opcode);
   instr->setOpcode(op);
@@ -480,7 +485,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
   }
 
   auto iType = op_it->second;
-  if (op == Opcode::FL || op == Opcode::FS) { 
+  if (op == Opcode::FL || op == Opcode::FS) {
     if (func3 != 0x2 && func3 != 0x3) {
       iType = InstType::V_TYPE;
     }
@@ -490,12 +495,12 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
   case InstType::R_TYPE:
     switch (op) {
     case Opcode::FCI:
-      switch (func7) {  
+      switch (func7) {
       case 0x2c: // FSQRT.S
       case 0x2d: // FSQRT.D
         instr->setDestReg(rd, RegType::Float);
         instr->addSrcReg(rs1, RegType::Float);
-        break;    
+        break;
       case 0x50: // FLE.S, FLT.S, FEQ.S
       case 0x51: // FLE.D, FLT.D, FEQ.D
         instr->setDestReg(rd, RegType::Integer);
@@ -515,31 +520,31 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         instr->addSrcReg(rs2, RegType::None);
         break;
       case 0x70: // FCLASS.S, FMV.X.S
-      case 0x71: // FCLASS.D, FMV.X.D        
+      case 0x71: // FCLASS.D, FMV.X.D
         instr->setDestReg(rd, RegType::Integer);
         instr->addSrcReg(rs1, RegType::Float);
         break;
       case 0x78: // FMV.S.X
-      case 0x79: // FMV.D.X        
+      case 0x79: // FMV.D.X
         instr->setDestReg(rd, RegType::Float);
         instr->addSrcReg(rs1, RegType::Integer);
         break;
       default:
         instr->setDestReg(rd, RegType::Float);
         instr->addSrcReg(rs1, RegType::Float);
-        instr->addSrcReg(rs2, RegType::Float);        
+        instr->addSrcReg(rs2, RegType::Float);
         break;
       }
       break;
     case Opcode::EXT1:
       switch (func7) {
       case 0:
-        switch (func3) {         
+        switch (func3) {
         case 0: // TMC
         case 3: // JOIN
           instr->addSrcReg(rs1, RegType::Integer);
           break;
-        case 1: // WSPAWN        
+        case 1: // WSPAWN
         case 4: // BAR
         case 5: // PRED
           instr->addSrcReg(rs1, RegType::Integer);
@@ -569,11 +574,11 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
 
   case InstType::I_TYPE: {
     instr->addSrcReg(rs1, RegType::Integer);
-    if (op == Opcode::FL) {
-      instr->setDestReg(rd, RegType::Float);      
+    if (op == Opcode::FL || op == Opcode::TC_FLUSH) {
+      instr->setDestReg(rd, RegType::Float);
     } else {
       instr->setDestReg(rd, RegType::Integer);
-    }    
+    }
     instr->setFunc3(func3);
     instr->setFunc7(func7);
     switch (op) {
@@ -583,11 +588,11 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
         if (func3 >= 5) {
           // rs1 holds zimm
           instr->setSrcReg(0, rs1, RegType::None);
-        }        
-      } else {        
+        }
+      } else {
         instr->setDestReg(rd, RegType::None);
         instr->setSrcReg(0, rs1, RegType::None);
-      }      
+      }
       // uint12
       instr->setImm(code >> shift_rs2);
       break;
@@ -621,7 +626,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
       break;
     }
   } break;
-  case InstType::S_TYPE: {    
+  case InstType::S_TYPE: {
     instr->addSrcReg(rs1, RegType::Integer);
     if (op == Opcode::FS) {
       instr->addSrcReg(rs2, RegType::Float);
@@ -661,7 +666,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
     auto imm = (bits_10_1 << 1) | (bit_11 << 11) | (bits_19_12 << 12) | (bit_20 << 20);
     instr->setImm(sext(imm, width_j_imm+1));
   } break;
-    
+
   case InstType::V_TYPE:
     switch (op) {
     case Opcode::VSET: {
@@ -728,6 +733,20 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
       default:
         std::abort();
       }
+    } else if (op == Opcode::HMMA) {
+        if (func3 == 0) {  // Normal load
+            instr->addSrcReg(rs1, RegType::Float);
+            instr->addSrcReg(rs2, RegType::Float);
+        }
+        if (func2 ==  0) { // acc reg mode
+            instr->addSrcReg(rs3, RegType::Float);
+            instr->setDestReg(rd, RegType::Float) ;
+        } else {         // acc in tc mode
+            instr->addSrcReg((((rd & 0x1F) << 5) | (rs3 & 0x1F)), RegType::TC) ;
+            instr->setDestReg((((rd & 0x1F) << 5) | (rs3 & 0x1F)), RegType::TC) ;
+
+        }
+
     } else {
       instr->setDestReg(rd, RegType::Float);
       instr->addSrcReg(rs1, RegType::Float);

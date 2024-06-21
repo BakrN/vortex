@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,22 +15,22 @@
 
 using namespace vortex;
 
-Cluster::Cluster(const SimContext& ctx, 
+Cluster::Cluster(const SimContext& ctx,
                  uint32_t cluster_id,
-                 ProcessorImpl* processor, 
-                 const Arch &arch, const 
-                 DCRS &dcrs) 
+                 ProcessorImpl* processor,
+                 const Arch &arch, const
+                 DCRS &dcrs)
   : SimObject(ctx, "cluster")
   , mem_req_port(this)
   , mem_rsp_port(this)
   , cluster_id_(cluster_id)
-  , cores_(arch.num_cores())  
+  , cores_(arch.num_cores())
   , barriers_(arch.num_barriers(), 0)
   , sharedmems_(arch.num_cores())
   , processor_(processor)
 {
   auto num_cores = arch.num_cores();
-  
+
   char sname[100];
   snprintf(sname, 100, "cluster%d-l2cache", cluster_id);
   l2cache_ = CacheSim::Create(sname, CacheSim::Config{
@@ -39,10 +39,10 @@ Cluster::Cluster(const SimContext& ctx,
     log2ceil(MEM_BLOCK_SIZE), // B
     log2ceil(L2_NUM_WAYS),  // W
     0,                      // A
-    XLEN,                   // address bits  
+    XLEN,                   // address bits
     L2_NUM_BANKS,           // number of banks
     1,                      // number of ports
-    5,                      // request size 
+    5,                      // request size
     true,                   // write-through
     false,                  // write response
     0,                      // victim size
@@ -60,7 +60,7 @@ Cluster::Cluster(const SimContext& ctx,
     log2ceil(L1_LINE_SIZE), // B
     log2ceil(sizeof(uint32_t)), // W
     log2ceil(ICACHE_NUM_WAYS),// A
-    XLEN,                   // address bits    
+    XLEN,                   // address bits
     1,                      // number of banks
     1,                      // number of ports
     1,                      // number of inputs
@@ -81,7 +81,7 @@ Cluster::Cluster(const SimContext& ctx,
     log2ceil(L1_LINE_SIZE), // B
     log2ceil(sizeof(Word)), // W
     log2ceil(DCACHE_NUM_WAYS),// A
-    XLEN,                   // address bits    
+    XLEN,                   // address bits
     DCACHE_NUM_BANKS,       // number of banks
     1,                      // number of ports
     DCACHE_NUM_BANKS,       // number of inputs
@@ -103,7 +103,7 @@ Cluster::Cluster(const SimContext& ctx,
     sharedmems_.at(i) = SharedMem::Create(sname, SharedMem::Config{
       (1 << SMEM_LOG_SIZE),
       sizeof(Word),
-      NUM_LSU_LANES, 
+      NUM_LSU_LANES,
       NUM_LSU_LANES,
       false
     });
@@ -111,24 +111,24 @@ Cluster::Cluster(const SimContext& ctx,
 
   // create cores
 
-  for (uint32_t i = 0; i < num_cores; ++i) {  
+  for (uint32_t i = 0; i < num_cores; ++i) {
     uint32_t core_id = cluster_id * num_cores + i;
-    cores_.at(i) = Core::Create(core_id, 
-                                this, 
-                                arch, 
-                                dcrs, 
+    cores_.at(i) = Core::Create(core_id,
+                                this,
+                                arch,
+                                dcrs,
                                 sharedmems_.at(i));
 
     cores_.at(i)->icache_req_ports.at(0).bind(&icaches_->CoreReqPorts.at(i).at(0));
-    icaches_->CoreRspPorts.at(i).at(0).bind(&cores_.at(i)->icache_rsp_ports.at(0));      
+    icaches_->CoreRspPorts.at(i).at(0).bind(&cores_.at(i)->icache_rsp_ports.at(0));
 
     for (uint32_t j = 0; j < NUM_LSU_LANES; ++j) {
       snprintf(sname, 100, "cluster%d-smem_demux%d_%d", cluster_id, i, j);
       auto smem_demux = SMemDemux::Create(sname);
-      
+
       cores_.at(i)->dcache_req_ports.at(j).bind(&smem_demux->ReqIn);
-      smem_demux->RspIn.bind(&cores_.at(i)->dcache_rsp_ports.at(j));        
-      
+      smem_demux->RspIn.bind(&cores_.at(i)->dcache_rsp_ports.at(j));
+
       smem_demux->ReqDc.bind(&dcaches_->CoreReqPorts.at(i).at(j));
       dcaches_->CoreRspPorts.at(i).at(j).bind(&smem_demux->RspDc);
 
@@ -142,7 +142,7 @@ Cluster::~Cluster() {
   //--
 }
 
-void Cluster::reset() {  
+void Cluster::reset() {
   for (auto& barrier : barriers_) {
     barrier.reset();
   }
@@ -214,6 +214,6 @@ Cluster::PerfStats Cluster::perf_stats() const {
   for (auto sharedmem : sharedmems_) {
     perf.sharedmem += sharedmem->perf_stats();
   }
-  
+
   return perf;
 }

@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -19,8 +19,8 @@ namespace vortex {
 
 class Warp;
 
-enum Opcode {   
-  NONE      = 0,    
+enum Opcode {
+  NONE      = 0,
   R_INST    = 0x33,
   L_INST    = 0x3,
   I_INST    = 0x13,
@@ -40,25 +40,27 @@ enum Opcode {
   FMADD     = 0x43,
   FMSUB     = 0x47,
   FMNMSUB   = 0x4b,
-  FMNMADD   = 0x4f,  
+  FMNMADD   = 0x4f,
   // RV64 Standard Extension
   R_INST_W  = 0x3b,
   I_INST_W  = 0x1b,
-  // Vector Extension  
+  // Vector Extension
   VSET      = 0x57,
+  // Tensor core
+  HMMA      = 0x7b,
+  TC_FLUSH  = 0x7c,
   // Custom Extensions
   EXT1      = 0x0b,
   EXT2      = 0x2b,
-  EXT3      = 0x5b,
-  EXT4      = 0x7b
+  EXT3      = 0x5b
 };
 
 enum InstType {
-  R_TYPE, 
-  I_TYPE, 
-  S_TYPE, 
-  B_TYPE, 
-  U_TYPE, 
+  R_TYPE,
+  I_TYPE,
+  S_TYPE,
+  B_TYPE,
+  U_TYPE,
   J_TYPE,
   V_TYPE,
   R4_TYPE
@@ -66,7 +68,7 @@ enum InstType {
 
 class Instr {
 public:
-  Instr() 
+  Instr()
     : opcode_(Opcode::NONE)
     , num_rsrcs_(0)
     , has_imm_(false)
@@ -92,19 +94,19 @@ public:
   }
 
   void setOpcode(Opcode opcode)  { opcode_ = opcode; }
-  void setDestReg(uint32_t destReg, RegType type) { 
-    rdest_type_ = type; 
-    rdest_ = destReg; 
+  void setDestReg(uint32_t destReg, RegType type) {
+    rdest_type_ = type;
+    rdest_ = destReg;
   }
-  void addSrcReg(uint32_t srcReg, RegType type) { 
-    rsrc_type_[num_rsrcs_] = type; 
-    rsrc_[num_rsrcs_] = srcReg; 
+  void addSrcReg(uint32_t srcReg, RegType type) {
+    rsrc_type_[num_rsrcs_] = type;
+    rsrc_[num_rsrcs_] = srcReg;
     ++num_rsrcs_;
   }
-  void setSrcReg(uint32_t index, uint32_t srcReg, RegType type) { 
-    rsrc_type_[index] = type; 
-    rsrc_[index] = srcReg; 
-    num_rsrcs_ = std::max<uint32_t>(num_rsrcs_, index+1); 
+  void setSrcReg(uint32_t index, uint32_t srcReg, RegType type) {
+    rsrc_type_[index] = type;
+    rsrc_[index] = srcReg;
+    num_rsrcs_ = std::max<uint32_t>(num_rsrcs_, index+1);
   }
   void setFunc2(uint32_t func2) { func2_ = func2; }
   void setFunc3(uint32_t func3) { func3_ = func3; }
@@ -128,8 +130,8 @@ public:
   uint32_t getNRSrc() const { return num_rsrcs_; }
   uint32_t getRSrc(uint32_t i) const { return rsrc_[i]; }
   RegType  getRSType(uint32_t i) const { return rsrc_type_[i]; }
-  uint32_t getRDest() const { return rdest_; }  
-  RegType  getRDType() const { return rdest_type_; }  
+  uint32_t getRDest() const { return rdest_; }
+  RegType  getRDType() const { return rdest_type_; }
   bool     hasImm() const { return has_imm_; }
   uint32_t getImm() const { return imm_; }
   uint32_t getVlsWidth() const { return vlsWidth_; }
@@ -153,7 +155,7 @@ private:
   RegType rdest_type_;
   uint32_t imm_;
   RegType rsrc_type_[MAX_REG_SOURCES];
-  uint32_t rsrc_[MAX_REG_SOURCES];  
+  uint32_t rsrc_[MAX_REG_SOURCES];
   uint32_t rdest_;
   uint32_t func2_;
   uint32_t func3_;
@@ -168,7 +170,7 @@ private:
   uint32_t vs3_;
   uint32_t vlmul_;
   uint32_t vsew_;
-  uint32_t vediv_;   
+  uint32_t vediv_;
 
   friend std::ostream &operator<<(std::ostream &, const Instr&);
 };

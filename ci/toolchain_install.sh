@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Copyright © 2019-2023
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 # http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,11 +16,11 @@
 # exit when any command fails
 set -e
 
-REPOSITORY=https://github.com/vortexgpgpu/vortex-toolchain-prebuilt/raw/master
+REPOSITORY=https://github.com/vortexgpgpu/vortex-toolchain-prebuilt/raw/0aa1a18a7e805b17924e41496fc8af9a571defd8
 TOOLDIR=${TOOLDIR:=/opt}
-OSDIR=${OSDIR:=ubuntu/bionic}
+OSDIR=${OSDIR:=ubuntu/focal}
 
-OS="${OS:=ubuntu/bionic}"
+OS="${OS:=ubuntu/focal}"
 
 riscv()
 {
@@ -36,7 +36,7 @@ riscv()
     cat riscv-gnu-toolchain.tar.bz2.parta* > riscv-gnu-toolchain.tar.bz2
     tar -xvf riscv-gnu-toolchain.tar.bz2
     cp -r riscv-gnu-toolchain $TOOLDIR
-    rm -f riscv-gnu-toolchain.tar.bz2*    
+    rm -f riscv-gnu-toolchain.tar.bz2*
     rm -rf riscv-gnu-toolchain
 }
 
@@ -54,7 +54,7 @@ riscv64()
     cat riscv64-gnu-toolchain.tar.bz2.parta* > riscv64-gnu-toolchain.tar.bz2
     tar -xvf riscv64-gnu-toolchain.tar.bz2
     cp -r riscv64-gnu-toolchain $TOOLDIR
-    rm -f riscv64-gnu-toolchain.tar.bz2*    
+    rm -f riscv64-gnu-toolchain.tar.bz2*
     rm -rf riscv64-gnu-toolchain
 }
 
@@ -73,7 +73,7 @@ llvm-vortex()
     cat llvm-vortex.tar.bz2.parta* > llvm-vortex.tar.bz2
     tar -xvf llvm-vortex.tar.bz2
     cp -r llvm-vortex $TOOLDIR
-    rm -f llvm-vortex.tar.bz2*    
+    rm -f llvm-vortex.tar.bz2*
     rm -rf llvm-vortex
 }
 
@@ -92,7 +92,7 @@ llvm-pocl()
     cat llvm-pocl.tar.bz2.parta* > llvm-pocl.tar.bz2
     tar -xvf llvm-pocl.tar.bz2
     cp -r llvm-pocl $TOOLDIR
-    rm -f llvm-pocl.tar.bz2*    
+    rm -f llvm-pocl.tar.bz2*
     rm -rf llvm-pocl
 }
 
@@ -110,11 +110,11 @@ verilator()
     wget $REPOSITORY/verilator/$OSDIR/verilator.tar.bz2
     tar -xvf verilator.tar.bz2
     cp -r verilator $TOOLDIR
-    rm -f verilator.tar.bz2    
+    rm -f verilator.tar.bz2
     rm -rf verilator
 }
 
-sv2v() 
+sv2v()
 {
     wget $REPOSITORY/sv2v/$OSDIR/sv2v.tar.bz2
     tar -xvf sv2v.tar.bz2
@@ -138,7 +138,7 @@ yosys()
     cat yosys.tar.bz2.parta* > yosys.tar.bz2
     tar -xvf yosys.tar.bz2
     cp -r yosys $TOOLDIR
-    rm -f yosys.tar.bz2*    
+    rm -f yosys.tar.bz2*
     rm -rf yosys
 }
 
@@ -160,7 +160,7 @@ while [ "$1" != "" ]; do
                 ;;
         --llvm-vortex ) llvm-vortex
                 ;;
-        --llvm-pocl ) llvm-pocl                
+        --llvm-pocl ) llvm-pocl
                 ;;
         --sv2v ) sv2v
                 ;;
@@ -172,7 +172,7 @@ while [ "$1" != "" ]; do
                 yosys
                 llvm-vortex
                 riscv
-                riscv64                
+                riscv64
                 ;;
         -h | --help ) show_usage
                 exit

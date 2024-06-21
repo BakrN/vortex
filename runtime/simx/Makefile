@@ -17,7 +17,7 @@ SRCS = vortex.cpp ../common/utils.cpp
 # Debugigng
 ifdef DEBUG
 	CXXFLAGS += -g -O0
-else    
+else
 	CXXFLAGS += -O2 -DNDEBUG
 endif
 
@@ -26,7 +26,7 @@ PROJECT = libvortex.so
 all: $(PROJECT)
 
 $(PROJECT): $(SRCS)
-	DESTDIR=../../runtime/simx $(MAKE) -C $(SIMX_DIR) ../../runtime/simx/libsimx.so
+	DESTDIR=../../runtime/simx $(MAKE) CONFIGS="$(CONFIGS)" -C $(SIMX_DIR) ../../runtime/simx/libsimx.so
 	$(CXX) $(CXXFLAGS) $^ $(LDFLAGS) -o $@
 
 clean:
