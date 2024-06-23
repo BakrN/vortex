@@ -1,10 +1,10 @@
 // Copyright © 2019-2023
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +18,8 @@
 #include <stack>
 #include "types.h"
 
+class TensorCore ;
+
 namespace vortex {
 
 class Arch;
@@ -26,13 +28,13 @@ class Instr;
 class pipeline_trace_t;
 
 struct DomStackEntry {
-  DomStackEntry(const ThreadMask &tmask, Word PC) 
+  DomStackEntry(const ThreadMask &tmask, Word PC)
     : tmask(tmask)
     , PC(PC)
     , fallthrough(false)
   {}
 
-  DomStackEntry(const ThreadMask &tmask) 
+  DomStackEntry(const ThreadMask &tmask)
     : tmask(tmask)
     , fallthrough(true)
   {}
@@ -90,12 +92,12 @@ private:
   void execute(const Instr &instr, pipeline_trace_t *trace);
 
   UUIDGenerator uui_gen_;
-  
+
   uint32_t warp_id_;
   const Arch& arch_;
   Core *core_;
   uint64_t issued_instrs_;
-  
+
   Word PC_;
   ThreadMask tmask_;
 
@@ -106,6 +108,8 @@ private:
 
   struct vtype vtype_;
   uint32_t vl_;
+
+  friend class ::TensorCore;
 };
 
 }
