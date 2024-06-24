@@ -99,6 +99,7 @@ inline void mma (float* A, float* B, float*C = nullptr, float*D = nullptr){
     }
 }
 
+// Execution inside tensor is as follow. Every thread in thread group has same A buffer. And therefore, every thread group is responsible for every element of its own row in the output tile
 // include a unrolled function for outer product as well
 
 template <int a_rows, int b_cols, int k_multiple, int thread_n, bool in_place=true, int cur_row =0 , int cur_col=0>
@@ -106,10 +107,10 @@ inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*regC , float* re
     // if it's equal to 1 then just store back directly
     float* s_regA = regA + cur_row;
     float* s_regB = regB + cur_col;
-    float* s_regC = regC + b_cols*thread_n*cur_row+ cur_col*thread_n;
+    float* s_regC = regC + thread_n*cur_row+ cur_col*a_rows*thread_n;
     float* s_regD = regD ;
     if constexpr (!in_place) {
-        s_regD = regD +b_cols*thread_n*cur_row+ cur_col*thread_n ;
+        s_regD = regD + thread_n*cur_row+ cur_col*a_rows*thread_n;
     }
     // unroll over k
     unrolled_for_func<0, k_multiple>([&](){
@@ -132,9 +133,9 @@ inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*regC , float* re
         s_regA += a_rows;
         s_regB += b_cols;
         // reset C
-        s_regC = regC + b_cols*thread_n*cur_row+ cur_col*thread_n;
+        s_regC = regC + thread_n*cur_row+ cur_col*a_rows*thread_n;
         if (!in_place) {
-            s_regD = regD + b_cols*thread_n*cur_row+ cur_col*thread_n;
+            s_regD = regD + thread_n*cur_row+ cur_col*a_rows*thread_n;
         }
     });
 

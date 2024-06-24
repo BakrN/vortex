@@ -45,7 +45,11 @@ else:
 
 
 
-
+def get_precision_ratio(op_type) :
+    if (op_type == 'fp16'):
+        return 2
+    if (op_type == 'fp32'):
+        return 1
 
 class MatMemOrientation:
     ROW_MAJOR = 0
@@ -151,16 +155,20 @@ class TCConfig:
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
 
 
+
 # Case where A buffer width == B buffer width (if not I will have to come up with better loading strategy)
 tc = TCConfig()
-tc.thread_group_size = args["num_dot_units"]
 tc.num_threads = args["num_threads"]
+tc.thread_group_size = args["num_dot_units"]
 tc.thread_n = int(tc.num_threads/tc.thread_group_size**2)
-tc.execution_latency = int(1 + math.log2(tc.thread_group_size))  # 1 for multiply ,
+tc.execution_latency = int(1 + math.log2(tc.thread_group_size*2))  # *2 for fp16 precision
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
 tc.cooperative_warps= args["cooperative_warps"]
 
+# Check for valid configuration here
+# Thread group size is also equal to participating threads in an output row
+assert tc.num_threads/tc.thread_group_size >= tc.thread_group_size, "Invalid configuration. Each thread must be able to calculate at least 1 output value per load"
 
 # 2. System parameters
 class GEMMArgs:
@@ -197,7 +205,7 @@ system.a_rows = args["A_ROWS"]
 system.b_cols = args["B_COLS"]
 system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
-system.k = int (tc.thread_group_size * 2) * system.k_multiple # * precision of fp16 (res_size/op_size)
+system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple # * precision of fp16 (res_size/op_size)
 print("TC")
 print (tc)
 print("GEMM")

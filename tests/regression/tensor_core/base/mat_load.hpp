@@ -77,11 +77,11 @@ inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  
         T* a_row_ptr = ptr + row_offset;
         const int row_stride = MAT_K * OP_size/Res_size;
 
-        T* _reg = reg;
+
         unrolled_for_func<0, NUM_K>([&](){
-            unrolled_load_row_row_major<0, 0, NUM_ROWS, 1, T, outer_row_stride>(a_row_ptr, _reg, row_stride); // this actually loads pe group
-            _reg += NUM_ROWS;
-            a_row_ptr += THREAD_GROUP_SIZE* OP_size/Res_size;
+            unrolled_load_row_row_major<0, 0, NUM_ROWS, 1, T, outer_row_stride>(a_row_ptr, reg, row_stride); // this actually loads pe group
+            reg += NUM_ROWS;
+            a_row_ptr += THREAD_GROUP_SIZE;
         });
     } else{
         //static_assert(false, "Need to implement something else.. (Would require unpacking) ");
@@ -124,37 +124,50 @@ inline void load_tile_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, 
         auto col_offset = (MAT_K*thread_group_id + (thread_id % THREAD_GROUP_SIZE))*OP_size/Res_size ;
         T* b_col_ptr = ptr + col_offset;
         const int col_stride= MAT_K * OP_size/Res_size;
-        T* _reg = reg ;
         unrolled_for_func<0, NUM_K>([&](){
-                unrolled_load_col_col_major<0, 0, NUM_COLS, 1, T, outer_col_stride>(b_col_ptr, _reg, col_stride);
-                b_col_ptr += THREAD_GROUP_SIZE* OP_size/Res_size;
-                _reg += NUM_COLS;
-                ;});
+                unrolled_load_col_col_major<0, 0, NUM_COLS, 1, T, outer_col_stride>(b_col_ptr, reg, col_stride);
+                b_col_ptr += THREAD_GROUP_SIZE;
+                reg += NUM_COLS;
+        ;});
     }
 }
 
+/*
+ * TODO: Add precision to load tile C function
+ * Outer rows loaded first then outer cols
+ * */
 template <typename T, int OP_size, int Res_size,int THREAD_N , // based on number of mac units inside lane
     int THREAD_GROUP_SIZE,    // output c row per thread group
     int NUM_LANES,
     int NUM_ROWS = 1,
+    int OUTER_COLS = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_c(T* ptr, T* reg, const int thread_id, const int MAT_M, const int MAT_N){
     constexpr int outer_row_stride = NUM_LANES/THREAD_GROUP_SIZE;
     const int thread_group_id = thread_id  / THREAD_GROUP_SIZE; // number of pes
+    constexpr int outer_col_stride = NUM_LANES/THREAD_GROUP_SIZE;
 
     if constexpr (layout == layout_t::ROW_MAJOR) {
         //vx_printf("(%d) C(rm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
         auto c_row_offset = (MAT_N*thread_group_id);
         auto c_col_offset = (thread_id % THREAD_GROUP_SIZE)*THREAD_N ;
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
-        unrolled_load_row_row_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_row_ptr, reg, MAT_N);
+        unrolled_for_func<0, OUTER_COLS>([&](){
+            unrolled_load_row_row_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_row_ptr, reg, MAT_N);
+            reg += NUM_ROWS*THREAD_N;
+            c_row_ptr += outer_col_stride;
+        });
     } else {
         //vx_printf("(%d) C(cm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
         auto c_row_offset = thread_group_id;
         auto c_col_offset = MAT_M*(thread_id % THREAD_GROUP_SIZE)*THREAD_N ;
-        T* c_row_ptr = ptr + c_row_offset + c_col_offset;
-        unrolled_load_row_col_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_row_ptr, reg, MAT_M);
+        T* c_col_ptr = ptr + c_row_offset + c_col_offset;
+        unrolled_for_func<0, OUTER_COLS>([&](){
+            unrolled_load_row_col_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_col_ptr, reg, MAT_M);
+            reg += NUM_ROWS*THREAD_N;
+            c_col_ptr += MAT_N*outer_col_stride;
+        });
     }
 }  // load a and b
 

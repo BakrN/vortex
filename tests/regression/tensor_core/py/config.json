@@ -1,7 +1,7 @@
 {
     "M": 2,
     "N": 2,
-    "K": 2,
+    "K": 4,
 
     "op_type": "fp16",
     "res_type": "fp32",
@@ -21,7 +21,7 @@
 
     "A_ROWS": 1,
     "B_COLS": 1,
-    "K_MULTIPLE": 1,
+    "K_MULTIPLE": 2,
     "cooperative_warps" : 0,
 
     "define_file": "defines.txt"

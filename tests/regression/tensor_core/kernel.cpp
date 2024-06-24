@@ -30,7 +30,7 @@ inline void load_fragment(float* ptr , float*reg , int tid, int dim0,int dim1){
         if constexpr(T == MatT::B) {
             load_tile_b<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE, NUM_THREADS,K_MULTIPLE,B_COLS>(ptr, reg, tid, dim0, dim1) ;
         }  else {
-            load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS>(ptr, reg, tid, dim0, dim1) ;
+            load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS, B_COLS>(ptr, reg, tid, dim0, dim1) ;
         }
     }
 }
@@ -117,6 +117,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                //#ifdef DEBUG
 
                    vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
+                   for (int col = 0 ; col< B_COLS; col+=1) {
                    for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
                        uint32_t* val = (uint32_t*)(&regA[idx]);
                        uint16_t _first = (uint16_t)(*val >> 16);
@@ -126,39 +127,39 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                        vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
                        vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
 
-                       val = (uint32_t*)(&regB[idx]);
-                       _first = (uint16_t)(*val >> 16);
-                       _second = (uint16_t)(*val & 0xFFFF);
-                       first = float16(_first);
-                       second = float16(_second);
-                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
-                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                       //uint32_t* val = (uint32_t*)(&regB[idx]);
+                       //uint16_t _first = (uint16_t)(*val >> 16);
+                       //uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                       //float16 first = float16(_first);
+                       //float16 second = float16(_second);
+                       //vx_printf("(%d, %d) regB = %f\n", col, idx, first.to_float32());
+                       //vx_printf("(%d, %d) regB = %f\n", col, idx+1, second.to_float32());
+                   }
                    }
                    for (int i = 0 ; i < A_ROWS; i++) {
                        //print regC
-                       for (int j = 0 ; j < TC_THREAD_N; j++) {
-                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N + j]);
+                       for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
+                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
                        }
                    }
 
                    //#endif
 
                // normal
-               tc_acc_reg_wb_reg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>(regA, regB, regC);
+               tc_acc_reg_wb_reg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>((float*)regA, (float*)regB, (float*)regC);
                //#ifdef DEBUG
-                for (int i = 0 ; i < A_ROWS; i++) {
-                       //print regC
-                       for (int j = 0 ; j < TC_THREAD_N; j++) {
-                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N + j]);
-                       }
-                   }
+               //for (int i = 0 ; i < A_ROWS; i++) {
+               //     for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
+               //         vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
+               //     }
+               // }
 
                //#endif
 
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * PREC_RATIO; // assumming col_major
            }
-           tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
+           tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }
