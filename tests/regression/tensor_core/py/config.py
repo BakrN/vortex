@@ -103,10 +103,6 @@ def save_matrices_to_file(A, B, C, D):
         D.tofile("D.bin")
 
 
-# For now will assume threads == num_pes
-
-#assert(args["num_pes"] == args["num_thread"], "Assuming num_pes == num_threads")
-args["num_pes"] = int(args["num_threads"] / args["num_groups"])
 print(args)
 
 
@@ -158,7 +154,7 @@ class TCConfig:
 # Case where A buffer width == B buffer width (if not I will have to come up with better loading strategy)
 tc = TCConfig()
 tc.thread_group_size = args["num_dot_units"]
-tc.num_threads = args["num_thread"]
+tc.num_threads = args["num_threads"]
 tc.thread_n = int(tc.num_threads/tc.thread_group_size**2)
 tc.execution_latency = int(1 + math.log2(tc.thread_group_size))  # 1 for multiply ,
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
@@ -190,7 +186,7 @@ class GEMMArgs:
     def Dk_multiple(self):
         return f"-DK_MULTIPLE={self.k_multiple}"
     def getdef(self):
-        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple}"
+        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])

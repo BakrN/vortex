@@ -73,7 +73,7 @@ inline void mma (float* A, float* B, float*C = nullptr, float*D = nullptr){
 
                 if constexpr (load == LoadMode::NORMAL) {
                     asm volatile(".insn r4 %[EXT], %[func3], %[func2], f%[rd], %[rs1], %[rs2], %[rs3]"::
-                        [rd] "i" (0)
+                        [rd] "i" (0),
                         [EXT] "i" (TC_EXT) ,
                         [func3] "i" ((int)load),
                         [func2] "i" ((int)(mode)),
@@ -84,7 +84,7 @@ inline void mma (float* A, float* B, float*C = nullptr, float*D = nullptr){
 
                 } else {
                     asm volatile(".insn r4 %[EXT], %[func3], %[func2], f%[rd], f%[rs1], f%[rs2], %[rs3]"::
-                        [rd] "i" (0)
+                        [rd] "i" (0),
                         [EXT] "i" (TC_EXT) ,
                         [func3] "i" ((int)load),
                         [func2] "i" ((int)(mode)),
@@ -102,7 +102,7 @@ inline void mma (float* A, float* B, float*C = nullptr, float*D = nullptr){
 // include a unrolled function for outer product as well
 
 template <int a_rows, int b_cols, int k_multiple, int thread_n, bool in_place=true, int cur_row =0 , int cur_col=0>
-inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*C , float* D=nullptr) {
+inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*regC , float* regD=nullptr) {
     // if it's equal to 1 then just store back directly
     float* s_regA = regA + cur_row;
     float* s_regB = regB + cur_col;
@@ -113,13 +113,21 @@ inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*C , float* D=nul
     }
     // unroll over k
     unrolled_for_func<0, k_multiple>([&](){
-        mat_mma<OperationMode::ACC_REG_WB_REG, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regD) ;
-        s_regC++;
-        if constexpr (!in_place) {
+        if constexpr (in_place) {
+            mma<OperationMode::ACC_REG_WB_REG, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regC) ;
+            s_regC++;
+        }else{
+            s_regC++;
             s_regD++;
         }
         unrolled_for_func<0,thread_n-1> ([&](){
-                mat_mma<OperationMode::ACC_REG_WB_REG, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, nullptr); s_regC++ if constexpr (!in_place) s_regD++;
+                if constexpr (in_place) {
+                    mma<OperationMode::ACC_REG_WB_REG, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regC); s_regC++;
+
+                } else {
+                    mma<OperationMode::ACC_REG_WB_REG, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regD);
+                    s_regC++; s_regD++;
+                }
         });
         s_regA += a_rows;
         s_regB += b_cols;
@@ -144,6 +152,5 @@ inline void tc_acc_reg_wb_reg (float* regA, float* regB , float*C , float* D=nul
     }
 }
 
-}
 
 #endif

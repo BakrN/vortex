@@ -25,12 +25,12 @@ struct tc_tile ;
 template<MatT T >
 inline void load_fragment(float* ptr , float*reg , int tid, int dim0,int dim1){
     if constexpr(T == MatT::A) {
-        load_tile_a<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE,TC_NUM_THREADS, K_MULTIPLE ,A_ROWS> (ptr, reg, tid, dim0, dim1);
+        load_tile_a<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE, NUM_THREADS,K_MULTIPLE,A_ROWS> (ptr, reg, tid, dim0, dim1);
     } else {
         if constexpr(T == MatT::B) {
-            load_tile_b<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE,TC_NUM_THREADS, K_MULTIPLE ,B_COLS>(ptr, reg, tid, dim0, dim1) ;
+            load_tile_b<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE, NUM_THREADS,K_MULTIPLE,B_COLS>(ptr, reg, tid, dim0, dim1) ;
         }  else {
-            load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS>(ptr, reg, tid, dim0, dim1) ;
+            load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS>(ptr, reg, tid, dim0, dim1) ;
         }
     }
 }
@@ -39,8 +39,8 @@ inline void load_fragment(float* ptr , float*reg , int tid, int dim0,int dim1){
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    const int thread_id = vx_thread_id();
-   //const int warp_id = vx_warp_id();
-   //const int core_id = vx_core_id();
+   const int warp_id = vx_warp_id();
+   const int core_id = vx_core_id();
 
    const int MAT_M = kernel_arg->M_;
    const int MAT_N = kernel_arg->N_;
@@ -73,7 +73,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
        blockRow = 0 ;
    }
 
-   //vx_printf("task_id: %d, blockCol = %d, blockRow = %d\n", task_id, blockCol, blockRow);
+   vx_printf("task_id: %d, blockCol = %d, blockRow = %d\n", task_id, blockCol, blockRow);
 
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO; // assuming col major
@@ -82,10 +82,10 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
 
 
-   //const layout_t a_layout = (layout_t)(kernel_arg->A_layout);
-   //const layout_t b_layout = (layout_t)(kernel_arg->B_layout);
-   //const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
-   //const layout_t d_layout = (layout_t)(kernel_arg->D_layout);
+   const layout_t a_layout = (layout_t)(kernel_arg->A_layout);
+   const layout_t b_layout = (layout_t)(kernel_arg->B_layout);
+   const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
+   const layout_t d_layout = (layout_t)(kernel_arg->D_layout);
 
    float* A_ptr = A_start;
    float* B_ptr = B_start;
@@ -94,7 +94,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    float regA[A_ROWS*K_MULTIPLE]; // THREAD_K*PREC_RATIO is always 1 i want to issue at once
    float regB[B_COLS*K_MULTIPLE];
-   float regC[A_ROWS*B_COLS* TC_THREAD_GROUP_SIZE] = {0}; // Number of mac units per lane
+   float regC[A_ROWS*B_COLS* TC_THREAD_N] = {0}; // Number of mac units per lane
 
    // Main GEMM (simple 1 warp impl)
    for (int i = 0; i < tileSizeRow; i+=tc_m) {
@@ -108,64 +108,66 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            load_fragment<MatT::C>(C_ptr, regC, thread_id, MAT_M, MAT_N);
            for (int k = 0 ; k < MAT_K; k+=tc_k){
 
-               load_fragment<MatT::A>(A_ptr, regA, thread_id, MAT_M, MAT_K);
+               load_fragment<MatT::A>(A_ptr, (float*)regA, thread_id, MAT_M, MAT_K);
 
-               load_fragment<MatT::B>(B_ptr, regB, thread_id, MAT_N, MAT_K);
+               load_fragment<MatT::B>(B_ptr, (float*)regB, thread_id, MAT_N, MAT_K);
 
-               // normal
-               tc_acc_reg_wb_reg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>(regA, regB, regC);
+
 
                //#ifdef DEBUG
 
-                   //vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                   //for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
-                   //    uint32_t* val = (uint32_t*)(&regA[idx]);
-                   //    uint16_t _first = (uint16_t)(*val >> 16);
-                   //    uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                   //    float16 first(_first) ;
-                   //    float16 second(_second);
-                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
-                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
+                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
+                       uint32_t* val = (uint32_t*)(&regA[idx]);
+                       uint16_t _first = (uint16_t)(*val >> 16);
+                       uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                       float16 first(_first) ;
+                       float16 second(_second);
+                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
+                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
 
-                   //    val = (uint32_t*)(&regB[idx]);
-                   //    _first = (uint16_t)(*val >> 16);
-                   //    _second = (uint16_t)(*val & 0xFFFF);
-                   //    first = float16(_first);
-                   //    second = float16(_second);
-                   //    vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
-                   //    vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
-                   //}
-                   //for (int i = 0 ; i < TC_OUTER_PRODUCT_ROWS; i++) {
-                   //    //print regC
-                   //    for (int j = 0 ; j < OTILE_COL; j++) {
-                   //        vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*OTILE_COL + j]);
-                   //    }
-                   //}
+                       val = (uint32_t*)(&regB[idx]);
+                       _first = (uint16_t)(*val >> 16);
+                       _second = (uint16_t)(*val & 0xFFFF);
+                       first = float16(_first);
+                       second = float16(_second);
+                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx, first.to_float32());
+                       vx_printf("(%d) regB[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   }
+                   for (int i = 0 ; i < A_ROWS; i++) {
+                       //print regC
+                       for (int j = 0 ; j < TC_THREAD_N; j++) {
+                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N + j]);
+                       }
+                   }
 
                    //#endif
 
+               // normal
+               tc_acc_reg_wb_reg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>(regA, regB, regC);
                //#ifdef DEBUG
-
-               //for (int idx = 0 ; idx < OTILE_COL; idx++) {
-               //    vx_printf("(%d) regD[%d] = %f\n", thread_id, idx, regD[idx]);
-               //}
+                for (int i = 0 ; i < A_ROWS; i++) {
+                       //print regC
+                       for (int j = 0 ; j < TC_THREAD_N; j++) {
+                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N + j]);
+                       }
+                   }
 
                //#endif
 
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * PREC_RATIO; // assumming col_major
            }
-           tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS>((float*)regC, (float*)D_ptr, thread_id, MAT_M, MAT_N);
+           tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }
    }
-   // Accumulation of first C here
 }
 
 
 int main(){
 	kernel_arg_t* arg = (kernel_arg_t*)KERNEL_ARG_DEV_MEM_ADDR;
-	vx_spawn_tasks(arg->num_tasks, (vx_spawn_tasks_cb)kernel_body, arg);
+    vx_spawn_tasks(arg->num_tasks, (vx_spawn_tasks_cb)kernel_body, arg);
     return 0 ;
 }

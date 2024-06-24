@@ -9,20 +9,23 @@
 
 template<typename T>
 class FIFO {
-private:
-    std::queue<T> queue;
-    size_t maxCapacity;
-
 public:
     FIFO() : maxCapacity(1){}
     FIFO(size_t capacity) : maxCapacity(capacity) {}
     ~FIFO(){ }
 
-    void enqueue(const T& element) {
+    void enqueue(T& element) {
         if (queue.size() >= maxCapacity) {
             throw std::overflow_error("Queue has reached its maximum capacity");
         }
         queue.push(element);
+    }
+
+    void enqueue(T&& element) {
+        if (queue.size() >= maxCapacity) {
+            throw std::overflow_error("Queue has reached its maximum capacity");
+        }
+        queue.emplace(element);
     }
 
     T dequeue() {
@@ -46,7 +49,7 @@ public:
         return queue.size();
     }
 
-    T front() const {
+    T& front() {
         if (queue.empty()) {
             throw std::out_of_range("Queue is empty");
         }
@@ -57,6 +60,11 @@ public:
         std::queue<T> emptyQueue;
         std::swap(queue, emptyQueue);
     }
+private:
+    std::queue<T> queue;
+    size_t maxCapacity;
+
+
 };
 
 

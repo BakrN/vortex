@@ -63,14 +63,14 @@ inline constexpr void unrolled_load_row_col_major(T* col_ptr, T* registers,  int
 // Cooperative thread thread sharing (32x)
 template <typename T, int OP_size, int Res_size,
     int THREAD_GROUP_SIZE,    // let's assume I know my thread_id beforehand
-    int NUM_THREADS,  // total number of threads
-    int K_MULTIPLE = 1,
+    int NUM_LANES,  // total number of threads
+    int NUM_K = 1,
     int NUM_ROWS = 1,  // Mac units  (determined by number of mac units i have inside the tensor core per lane or just number of outer product I want to do... )
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  const int MAT_K){
     const int thread_group_id = thread_id  / THREAD_GROUP_SIZE; // number of pes
-    constexpr int outer_row_stride = NUM_THREADS/THREAD_GROUP_SIZE;
+    constexpr int outer_row_stride = NUM_LANES/THREAD_GROUP_SIZE;
 
     if constexpr (layout == layout_t::ROW_MAJOR) {
         auto row_offset = MAT_K*thread_group_id *OP_size/Res_size + (thread_id % THREAD_GROUP_SIZE);
@@ -78,13 +78,13 @@ inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  
         const int row_stride = MAT_K * OP_size/Res_size;
 
         T* _reg = reg;
-        unrolled_for_func<0, K_MULTIPLE>([&](){
+        unrolled_for_func<0, NUM_K>([&](){
             unrolled_load_row_row_major<0, 0, NUM_ROWS, 1, T, outer_row_stride>(a_row_ptr, _reg, row_stride); // this actually loads pe group
             _reg += NUM_ROWS;
             a_row_ptr += THREAD_GROUP_SIZE* OP_size/Res_size;
         });
     } else{
-        static_assert(false, "Need to implement something else.. (Would require unpacking) ");
+        //static_assert(false, "Need to implement something else.. (Would require unpacking) ");
         ////
         //auto row_offset = MAT_N*thread_group_id*OP_SIZE/Res_size + MAT_M*(thread_id% THREAD_GROUP_SIZE);
         //T* a_row_ptr = ptr + row_offset;
@@ -98,35 +98,35 @@ inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  
  * */
 
 // Sharing happens on the B matrix
-template <typename T, int OP_size, int Res_size, int THREAD_K,  //(based on dot product width)
+template <typename T, int OP_size, int Res_size,   //(based on dot product width)
     int THREAD_GROUP_SIZE,    // let's assume I know my thread_id beforehand
-    int NUM_THREADS,  // total number of threads
-    int K_MULTIPLE = 1,  // so this can go in either  (outer prodcut can go in either way)
+    int NUM_LANES,  // total number of threads
+    int NUM_K = 1,  // so this can go in either  (outer prodcut can go in either way)
     int NUM_COLS = 1,
     layout_t layout = layout_t::COL_MAJOR
 >
 inline void load_tile_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, const int MAT_K) {
     const int thread_group_id = thread_id  / THREAD_GROUP_SIZE; // number of pes
-    constexpr int outer_col_stride = NUM_THREADS/THREAD_GROUP_SIZE;
+    constexpr int outer_col_stride = NUM_LANES/THREAD_GROUP_SIZE;
 
     if constexpr (layout == layout_t::ROW_MAJOR)  {
 
-        static_assert(false, "Need to implement something else.. (Not supported. Would require unpacking)");
+        //static_assert(false, "Need to implement something else.. (Not supported. Would require unpacking)");
         //auto col_offset = (thread_group_id + MAT_N*(thread_id % THREAD_GROUP_SIZE)*THREAD_K )*OP_size/Res_size ;
         //T* b_col_ptr = ptr + col_offset;
         //const int col_stride = MAT_N * OP_size/Res_size;
-        //unrolled_for_func<0, K_MULTIPLE>([&](){
+        //unrolled_for_func<0, NUM_K>([&](){
         //        unrolled_load_col_row_major<0, 0, NUM_COLS,THREAD_K/(Res_size/OP_size), T, outer_col_stride>(b_col_ptr, reg, col_stride);
         //        b_col_ptr += THREAD_GROUP_SIZE*THREAD_K*OP_size/Res_size;
         //        ;}, b_col_ptr, reg+THREAD_K*OP_size/Res_size, col_stride);
     } else {
         //vx_printf("(%d) B(cm) col= %d\n", thread_id,  (col_group * TILE_COLS + thread_id % TILE_COLS));
-        auto col_offset = (MAT_K*thread_group_id + (thread_id % THREAD_GROUP_SIZE)*THREAD_K )*OP_size/Res_size ;
+        auto col_offset = (MAT_K*thread_group_id + (thread_id % THREAD_GROUP_SIZE))*OP_size/Res_size ;
         T* b_col_ptr = ptr + col_offset;
         const int col_stride= MAT_K * OP_size/Res_size;
         T* _reg = reg ;
-        unrolled_for_func<0, K_MULTIPLE>([&](){
-                unrolled_load_col_col_major<0, 0, NUM_COLS,THREAD_K/(Res_size/OP_size), T, outer_col_stride>(b_col_ptr, _reg, col_stride);
+        unrolled_for_func<0, NUM_K>([&](){
+                unrolled_load_col_col_major<0, 0, NUM_COLS, 1, T, outer_col_stride>(b_col_ptr, _reg, col_stride);
                 b_col_ptr += THREAD_GROUP_SIZE* OP_size/Res_size;
                 _reg += NUM_COLS;
                 ;});
@@ -135,23 +135,23 @@ inline void load_tile_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, 
 
 template <typename T, int OP_size, int Res_size,int THREAD_N , // based on number of mac units inside lane
     int THREAD_GROUP_SIZE,    // output c row per thread group
-    int NUM_THREADS,
+    int NUM_LANES,
     int NUM_ROWS = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_c(T* ptr, T* reg, const int thread_id, const int MAT_M, const int MAT_N){
-    constexpr int outer_row_stride = NUM_THREADS/THREAD_GROUP_SIZE;
+    constexpr int outer_row_stride = NUM_LANES/THREAD_GROUP_SIZE;
     const int thread_group_id = thread_id  / THREAD_GROUP_SIZE; // number of pes
 
     if constexpr (layout == layout_t::ROW_MAJOR) {
         //vx_printf("(%d) C(rm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
-        auto c_row_offset = (MAT_N*thread_group_id)*OP_size/Res_size ;
+        auto c_row_offset = (MAT_N*thread_group_id);
         auto c_col_offset = (thread_id % THREAD_GROUP_SIZE)*THREAD_N ;
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
         unrolled_load_row_row_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_row_ptr, reg, MAT_N);
     } else {
         //vx_printf("(%d) C(cm) row= %d\n", thread_id,  row_group * TILE_ROWS + (thread_id % TILE_ROWS));
-        auto c_row_offset = thread_group_id*OP_size/Res_size ;
+        auto c_row_offset = thread_group_id;
         auto c_col_offset = MAT_M*(thread_id % THREAD_GROUP_SIZE)*THREAD_N ;
         T* c_row_ptr = ptr + c_row_offset + c_col_offset;
         unrolled_load_row_col_major<0, 0,NUM_ROWS,THREAD_N,  T, outer_row_stride>(c_row_ptr, reg, MAT_M);

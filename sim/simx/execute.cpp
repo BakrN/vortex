@@ -1321,23 +1321,31 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     trace->wb = trace->rdest_type == RegType::Float ? true : false;
     int type = TCOpType::FP16 ;
     bool normal_load = false;
+    std::cout << "executing TC trace: \n";
+    std::cout << "load type: ";
     if (instr.getNRSrc() > 1) {  // Normal mode
         type |= (int)TCOpType::NORMAL_LOAD;
         normal_load = true;
+        std::cout << "normal_load\n";
     } else {
         type |= TCOpType::C_ONLY;
+        std::cout << "c_only\n";
     }
+    std::cout << " Type: ";
     if (trace->wb) { //WB reg
         if (normal_load) {
             if(instr.getRSType(2) == RegType::TC) {
                 type |= TCOpType::ACC_BUF_WB_REG;
+                std::cout << " ACC_BUF_WB_REG\n";
             }
             else {
                 type |= TCOpType::ACC_REG_WB_REG;
+                std::cout << " ACC_REG_WB_REG\n";
             }
         } else {
             if(instr.getRSType(0) == RegType::Float) {
                 type |= TCOpType::ACC_REG_WB_REG;
+                std::cout << " ACC_REG_WB_REG\n";
             } else {
                 // Invalid
             }
@@ -1346,11 +1354,14 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
         if (normal_load) {
             if (instr.getRSType(2) == RegType::TC) {
                 type |= TCOpType::ACC_REG_WB_BUF;
+                std::cout << " ACC_REG_WB_BUF\n";
             } else {
                 type |= TCOpType::ACC_BUF_WB_BUF;
+                std::cout << " ACC_BUF_WB_BUF\n";
             }
         } else {
             type |= TCOpType::ACC_REG_WB_BUF; // cannot have c only load in buf mode
+            std::cout << " (INVALID) ACC_REG_WB_BUF\n";
         }
     }
 
@@ -1361,6 +1372,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     if (instr.getNRSrc() > 2) {
       trace->rsrc3 = instr.getRSrc(2);
     }
+    std::cout << "rsrc1: " << trace->rsrc1 << " rsrc2: " << trace->rsrc2 << " rsrc3: " << trace->rsrc3 << std::endl;
     trace->tc_type = (vortex::TCOpType)type;
     this->core_->func_tensor_core_->execute(trace);
   }break;

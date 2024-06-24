@@ -8,6 +8,30 @@
 
 
 
+#ifndef TC_THREAD_GROUP_SIZE
+#define TC_THREAD_GROUP_SIZE 1
+#endif
+
+#ifndef NUM_THREADS
+#define NUM_THREADS 2
+#endif
+
+#ifndef TC_THREAD_N
+#define TC_THREAD_N 2
+#endif
+
+#ifndef TC_MAT_BUF_DEPTH
+#define TC_MAT_BUF_DEPTH 2
+#endif
+
+#ifndef TC_OUTPUT_FIFO_SIZE
+#define TC_OUTPUT_FIFO_SIZE 2
+#endif
+
+#ifndef TC_EXECUTION_LAT
+#define TC_EXECUTION_LAT 2
+#endif
+
 class TensorCore {
     public :
         struct Config_t {
@@ -16,10 +40,10 @@ class TensorCore {
             size_t thread_group_size; // function of mac units
             size_t num_threads;
             size_t thread_n;
-            // PE Group parameter
             size_t input_mat_buf_depth;
             size_t output_fifo_size;
             size_t execution_latency = 1;
+            size_t num_tile_regs= 1;
             void print() const{
             }
         };

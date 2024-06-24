@@ -1,4 +1,4 @@
-PROJECT = tensor_core
+PROJECT = tensor_core_gemm
 
 SRCS = main.cpp
 

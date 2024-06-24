@@ -17,8 +17,8 @@ CONFIGS="${tc_defines}" make
 cd $cur
 
 make clean-all
-make DEFINES+="${tc_defines}"
-make asm DEFINES+="${tc_defines}"
+make EXTFLAGS+="${tc_defines}"
+make asm EXTFLAGS+="${tc_defines}"
 make run-simx
 #make
 
