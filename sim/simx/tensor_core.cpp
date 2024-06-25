@@ -113,8 +113,8 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
                 std::cout << std::endl;
             }
 
-            size_t row = tid / m_config.thread_group_size; // shared between all threads in threadgroup
-            size_t start_col = (tid % m_config.thread_group_size)*m_config.thread_n ; // output col
+            size_t row = tid / m_config.thread_group_size * m_config.thread_group_size; // shared between all threads in threadgroup
+            size_t start_col = (tid % m_config.thread_group_size)*m_config.thread_n * m_config.thread_group_size ; // output col
             if constexpr (FUNC){
                 std::cout << "tid(" << tid << ") Adding a row: ";
                 for (size_t i = 0 ; i < m_config.thread_group_size; i++) {
