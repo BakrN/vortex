@@ -121,7 +121,7 @@ inline void load_tile_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, 
         //        ;}, b_col_ptr, reg+THREAD_K*OP_size/Res_size, col_stride);
     } else {
         //vx_printf("(%d) B(cm) col= %d\n", thread_id,  (col_group * TILE_COLS + thread_id % TILE_COLS));
-        auto col_offset = (MAT_K*thread_group_id + (thread_id % THREAD_GROUP_SIZE))*OP_size/Res_size ;
+        auto col_offset = (MAT_K*thread_group_id *OP_size/Res_size)+ (thread_id % THREAD_GROUP_SIZE);
         T* b_col_ptr = ptr + col_offset;
         const int col_stride= MAT_K * OP_size/Res_size;
         unrolled_for_func<0, NUM_K>([&](){
