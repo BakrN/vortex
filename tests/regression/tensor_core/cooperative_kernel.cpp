@@ -7,6 +7,9 @@
 #include "base/mat_store.hpp"
 #include "common.h"
 
+/** NOTES
+ *  Before and after barrier ids are unique to each workgroup
+ * **/
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 

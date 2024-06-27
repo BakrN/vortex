@@ -44,6 +44,7 @@ class TensorCore {
             size_t output_fifo_size;
             size_t execution_latency = 1;
             size_t num_tile_regs= 1;
+            size_t num_tile_bufs = 1;
             void print() const{
             }
         };
@@ -75,6 +76,7 @@ class TensorCore {
             bool reg_wb;
             vortex::pipeline_trace_t* trace;
             int tile_reg;
+            int tile_buf;
             int idx;
         };
         // per warp per lane, vector reg
@@ -82,7 +84,7 @@ class TensorCore {
         std::vector<std::vector<FIFO<std::vector<uint32_t>>>> b;
         std::vector<std::vector<FIFO<uint32_t>>> c;
         std::vector<std::queue<WritebackInfo>> trace_q; // per warp , (reg wb / acc, reg)
-        std::vector<std::vector<std::vector<uint32_t>>>  tile_reg;// lane, tile reg, thread_n val
+        std::vector<std::vector<std::vector<uint32_t>>>  tile_reg;// lane, buf, tile reg [val] //(tile reg is for outer product & tile_n)
 
         uint32_t out_fifo_credits;
         std::queue<std::pair<uint64_t,vortex::pipeline_trace_t*>> commit_fifo;

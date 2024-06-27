@@ -146,7 +146,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                    //#endif
 
                // normal
-               tc_acc_reg_wb_reg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>((float*)regA, (float*)regB, (float*)regC);
+               tc_mma<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>((float*)regA, (float*)regB, (float*)regC);
                //#ifdef DEBUG
                //for (int i = 0 ; i < A_ROWS; i++) {
                //     for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {

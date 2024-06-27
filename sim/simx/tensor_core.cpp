@@ -30,8 +30,8 @@ TensorCore::TensorCore(vortex::Core* _core, Config_t config) :  m_config(config)
     tile_reg.resize(config.num_threads);
     for (int lane = 0 ; lane < (int)m_config.num_threads;lane++) {
         tile_reg[lane].resize(config.num_tile_regs);
-        for (int reg = 0 ; reg < (int)config.num_tile_regs; reg++) {
-            tile_reg[lane][reg].resize(config.thread_n, 0) ;
+        for (int buf= 0 ; buf< (int)config.num_tile_bufs; buf++) {
+            tile_reg[lane][buf].resize(config.num_tile_regs) ;
         }
     }
 }
@@ -106,7 +106,10 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
 
                 std::cout << "tid(" << tid << ") Adding c from regs: ";
                 for (int i =0 ; i < m_config.thread_n; i++) {
-                    val = tile_reg[tid][trace->rsrc3][i]; // do this thread_n number of times
+                    //
+                    auto reg = trace->rsrc3; // IN hw value encoded in imm
+                    auto buf = trace->wid/ m_config.num_tile_bufs;
+                    val = tile_reg[tid][buf][reg+1]; // do this thread_n number of times
                     c[wid][tid].enqueue(val);
                     std::cout << uint32_to_float32(val) << " , ";
                 }
@@ -162,12 +165,12 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
         info.trace = trace;
         trace_q[wid].push(info);
     } else {
-        for (int i = 0 ; i < m_config.thread_n; i++) {
+        for (int i = 0 ; i < (int)m_config.thread_n; i++) {
             WritebackInfo info;
             info.reg_wb = false;
             info.trace= nullptr;
-            info.tile_reg = trace->rsrc3;
-            info.idx = i ;
+            info.tile_reg = trace->rsrc3 + i; // wb to tile reg
+            info.tile_buf = trace->wid / m_config.num_tile_bufs;
             trace_q[wid].push(info);
         }
     }
@@ -199,7 +202,7 @@ void TensorCore::compute() { // this step is only for functional  portion
                         std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
                         << " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
                 } else {
-                    tile_reg[tid][wb_info.tile_reg][wb_info.idx]= result;
+                    tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = result;
                 }
                 }
                 b[wid][tid].dequeue();
