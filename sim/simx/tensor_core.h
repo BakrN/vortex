@@ -32,6 +32,14 @@
 #define TC_EXECUTION_LAT 2
 #endif
 
+#ifndef TC_NUM_TILE_REGS
+#define TC_NUM_TILE_REGS 1
+#endif
+
+#ifndef TC_NUM_TILE_BUFS
+#define TC_NUM_TILE_BUFS 1
+#endif
+
 class TensorCore {
     public :
         struct Config_t {
@@ -65,11 +73,12 @@ class TensorCore {
         Config_t m_config;
         uint64_t m_cycle = 0;
         uint32_t m_step = 0  ;
+        statistics::Statistic* mac_fire;
         // Ticks functions
         template <bool FUNC>
         bool handleInput(vortex::pipeline_trace_t* trace); // accepted
         template <bool FUNC>
-        void compute(); // queue output stuff after N cycles
+        bool compute(); // queue output stuff after N cycles
         vortex::pipeline_trace_t* queueCommit(); // return <wis, trace> (in case of tile wb)
     private:
         struct WritebackInfo{
@@ -82,13 +91,14 @@ class TensorCore {
         // per warp per lane, vector reg
         std::vector<std::vector<std::vector<uint32_t>>> a;
         std::vector<std::vector<FIFO<std::vector<uint32_t>>>> b;
-        std::vector<std::vector<FIFO<uint32_t>>> c;
+        std::vector<std::vector<FIFO<std::tuple<bool, uint32_t*, uint32_t>>>> c; // std tuple = ( bool: tile_accumulate,  uint32_t* to tile reg, uint32_t value if reg acc)
         std::vector<std::queue<WritebackInfo>> trace_q; // per warp , (reg wb / acc, reg)
         std::vector<std::vector<std::vector<uint32_t>>>  tile_reg;// lane, buf, tile reg [val] //(tile reg is for outer product & tile_n)
 
         uint32_t out_fifo_credits;
         std::queue<std::pair<uint64_t,vortex::pipeline_trace_t*>> commit_fifo;
         vortex::Core* core ;
+
 
         uint32_t dot_product(Precision input_precision, Precision output_precision, const std::vector<uint32_t>& a, const std::vector<uint32_t>& b , uint32_t c  );
 };

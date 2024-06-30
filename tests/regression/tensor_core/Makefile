@@ -2,7 +2,7 @@ PROJECT = tensor_core_gemm
 
 SRCS = main.cpp
 
-VX_SRCS = kernel.cpp
+VX_SRCS = cooperative_kernel.cpp
 
 OPTS ?= -n64
 

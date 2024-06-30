@@ -32,7 +32,7 @@ parser.add_argument('--num_dot_units', type=int, default=1, help='Number of tran
 parser.add_argument('--A_ROWS', type=int, default=1, help='Outer product A rows')
 parser.add_argument('--B_COLS', type=int, default=1, help='Outer product B cols')
 parser.add_argument('--K_MULTIPLE', type=int, default=1, help='Hide latency using k multiple')
-parser.add_argument('--cooperative_warps', type=int, default=0, help='cooperative warp group size')
+parser.add_argument('--warp_group_size', type=int, default=0, help='Warp group size')
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
 args = parser.parse_args()
@@ -132,7 +132,7 @@ class TCConfig:
     output_fifo_size = 0
     execution_latency = 0
 
-    cooperative_warps = 0
+    warp_group_size = 0
     def Dthread_group_size(self):
         return f"-DTC_THREAD_GROUP_SIZE={self.thread_group_size}"
     def Dnum_threads(self):
@@ -146,10 +146,10 @@ class TCConfig:
         return f"-DTC_MAT_BUF_DEPTH={self.input_mat_buf_depth}"
     def Doutput_fifo_size(self):
         return f"-DTC_OUTPUT_FIFO_SIZE={self.output_fifo_size}"
-    def Dwarp_coop(self):
-        return f"-DTC_USE_TILES"
+    def Dwarp_group_size(self):
+        return f"-DWARP_GROUP_SIZE={self.warp_group_size}"
     def getdef(self):
-        return f"{self.Dthread_group_size()} {self.Dnum_threads()} {self.Dthread_n()} {self.Dexec_latency()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Dwarp_coop() if self.cooperative_warps else ''}"
+        return f"{self.Dthread_group_size()} {self.Dnum_threads()} {self.Dthread_n()} {self.Dexec_latency()} {self.Dmat_buf_depth()} {self.Doutput_fifo_size()} {self.Dwarp_group_size()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -164,11 +164,12 @@ tc.thread_n = int(tc.num_threads/tc.thread_group_size**2)
 tc.execution_latency = int(1 + math.log2(tc.thread_group_size*2))  # *2 for fp16 precision
 tc.input_mat_buf_depth = args["input_mat_buf_depth"]
 tc.output_fifo_size = args["output_fifo_size"]
-tc.cooperative_warps= args["cooperative_warps"]
+tc.warp_group_size = args["warp_group_size"]
 
 # Check for valid configuration here
 # Thread group size is also equal to participating threads in an output row
 assert tc.num_threads/tc.thread_group_size >= tc.thread_group_size, "Invalid configuration. Each thread must be able to calculate at least 1 output value per load"
+assert tc.warp_group_size != 1 , "Invalid warp group size. Warp group size cannot be 1"
 
 # 2. System parameters
 class GEMMArgs:
@@ -205,7 +206,7 @@ system.a_rows = args["A_ROWS"]
 system.b_cols = args["B_COLS"]
 system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
-system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple # * precision of fp16 (res_size/op_size)
+system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple  # * precision of fp16 (res_size/op_size)
 print("TC")
 print (tc)
 print("GEMM")
@@ -216,7 +217,7 @@ print(system)
 
 with open(args["define_file"], "w") as f:
     f.write(f"-DMM_M={args['M']} -DMM_N={args['N']} -DMM_K={args['K']} -DTC_OP_SIZE={getCSize(args['op_type'])} -DTC_RES_SIZE={getCSize(args['res_type'])} {system.getdef()} {tc.getdef()}  \
-    -DNUM_THREADS={args['num_threads']} -DNUM_WARPS={args['num_warps']} -DNUM_CORES={args['num_cores']} -DNUM_CLUSTERS={args['num_clusters']}")  # Parameters
+    -DNUM_THREADS={args['num_threads']} -DNUM_WARPS={args['num_warps']} -DNUM_CORES={args['num_cores']} -DNUM_CLUSTERS={args['num_clusters']} -DTC_NUM_TILE_REGS={system.a_rows * system.b_cols * tc.thread_n} -DTC_NUM_TILE_BUFS={int(args['num_warps'] /tc.warp_group_size) if tc.warp_group_size else 1}")  # Parameters
     f.close()
 
 

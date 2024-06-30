@@ -1347,21 +1347,22 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
                 type |= TCOpType::ACC_REG_WB_REG;
                 std::cout << " ACC_REG_WB_REG\n";
             } else {
-                // Invalid
+                type |= TCOpType::ACC_BUF_WB_REG;
+                std::cout << " ACC_BUF_WB_REG\n";
             }
         }
     } else { // wb buf
         if (normal_load) {
             if (instr.getRSType(2) == RegType::TC) {
-                type |= TCOpType::ACC_REG_WB_BUF;
-                std::cout << " ACC_REG_WB_BUF\n";
-            } else {
                 type |= TCOpType::ACC_BUF_WB_BUF;
                 std::cout << " ACC_BUF_WB_BUF\n";
+            } else {
+                type |= TCOpType::ACC_REG_WB_BUF;
+                std::cout << " ACC_REG_WB_BUF\n";
             }
         } else {
             type |= TCOpType::ACC_REG_WB_BUF; // cannot have c only load in buf mode
-            std::cout << " (INVALID) ACC_REG_WB_BUF\n";
+            std::cout << " ACC_REG_WB_BUF\n";
         }
     }
 
@@ -1373,6 +1374,7 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
       trace->rsrc3 = instr.getRSrc(2);
     }
     std::cout << "rsrc1: " << trace->rsrc1 << " rsrc2: " << trace->rsrc2 << " rsrc3: " << trace->rsrc3 << std::endl;
+    std::cout << "rd: " << trace->rdest << std::endl;
     trace->tc_type = (vortex::TCOpType)type;
     this->core_->func_tensor_core_->execute(trace);
   }break;

@@ -421,6 +421,9 @@ static const char* op_string(const Instr &instr) {
     default:
       std::abort();
     }
+  case Opcode::HMMA: {
+    return "HMMA" ;
+  }
   default:
     std::abort();
   }

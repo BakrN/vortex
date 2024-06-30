@@ -176,17 +176,16 @@ inline void load_tile_c(T* ptr, T* reg, const int thread_id, const int MAT_M, co
  * Workgroup api
  *
  * */
-
 template <typename T, int OP_size, int Res_size,
     int THREAD_GROUP_SIZE,    // let's assume I know my thread_id beforehand
     int NUM_LANES,  // total number of threads
     int NUM_K = 1,
     int NUM_ROWS = 1,  // Mac units  (determined by number of mac units i have inside the tensor core per lane or just number of outer product I want to do... )
-    int WARP_GROUP_SIZE = 1,
+    int WARPGROUP_SIZE = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_a_wg(T* ptr, T* reg, const int warp_id, const int thread_id, const int MAT_M, const int MAT_K){ // Load tile a worgroup
-    const int wg_idx = warp_id % WARP_GROUP_SIZE;
+    const int wg_idx = warp_id % WARPGROUP_SIZE;
     if constexpr (layout == layout_t::ROW_MAJOR) {
         ptr += THREAD_GROUP_SIZE *NUM_K * wg_idx;
     } else {
@@ -201,18 +200,18 @@ template <typename T, int OP_size, int Res_size,   //(based on dot product width
     int NUM_LANES,  // total number of threads
     int NUM_K = 1,  // so this can go in either  (outer prodcut can go in either way)
     int NUM_COLS = 1,
-    int WARP_GROUP_SIZE = 1,
+    int WARPGROUP_SIZE = 1,
     layout_t layout = layout_t::COL_MAJOR
 >
 inline void load_tile_b_wg(T* ptr, T* reg, const int warp_id, const int thread_id, const int MAT_N, const int MAT_K) {
      // Load tile a worgroup
-    const int wg_idx = warp_id % WARP_GROUP_SIZE;
+    const int wg_idx = warp_id % WARPGROUP_SIZE;
     if constexpr (layout == layout_t::COL_MAJOR) {
         ptr += THREAD_GROUP_SIZE *NUM_K * wg_idx;
     } else {
         ptr += THREAD_GROUP_SIZE *NUM_K * wg_idx * MAT_N;
     }
-    load_tile_b<T, OP_size, Res_size,THREAD_GROUP_SIZE,NUM_LANES,NUM_K,NUM_COLS,WARP_GROUP_SIZE,layout>( ptr, reg, thread_id, MAT_N, MAT_K);
+    load_tile_b<T, OP_size, Res_size,THREAD_GROUP_SIZE,NUM_LANES,NUM_K,NUM_COLS,layout>( ptr, reg, thread_id, MAT_N, MAT_K);
 
 }
 
@@ -222,17 +221,16 @@ template <typename T, int OP_size, int Res_size,int THREAD_N , // based on numbe
     int NUM_LANES,
     int NUM_ROWS = 1,
     int OUTER_COLS = 1,
-    int WARP_GROUP_SIZE = 1,
+    int WARPGROUP_SIZE = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_c_wg(T* ptr, T* reg, const int warp_id, const int thread_id, const int MAT_M, const int MAT_N) {
-    const int wg_idx = warp_id % WARP_GROUP_SIZE;
+    const int wg_idx = warp_id % WARPGROUP_SIZE;
     // only load in for warp leader
     if (wg_idx == 0)  {
-        load_tile_c<T,OP_size,Res_size,THREAD_N,THREAD_GROUP_SIZE,NUM_LANES,NUM_ROWS,OUTER_COLS, WARP_GROUP_SIZE, layout>(ptr, reg, thread_id, MAT_M, MAT_N);
+        load_tile_c<T,OP_size,Res_size,THREAD_N,THREAD_GROUP_SIZE,NUM_LANES,NUM_ROWS,OUTER_COLS, layout>(ptr, reg, thread_id, MAT_M, MAT_N);
     }
 }
-
 
 
 #endif

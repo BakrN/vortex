@@ -73,7 +73,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
        blockRow = 0 ;
    }
 
-   vx_printf("task_id: %d, blockCol = %d, blockRow = %d\n", task_id, blockCol, blockRow);
+   //vx_printf("task_id: %d, blockCol = %d, blockRow = %d\n", task_id, blockCol, blockRow);
 
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO; // assuming col major
@@ -116,32 +116,32 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
                //#ifdef DEBUG
 
-                   vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                   for (int col = 0 ; col< B_COLS; col+=1) {
-                   for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
-                       uint32_t* val = (uint32_t*)(&regA[idx]);
-                       uint16_t _first = (uint16_t)(*val >> 16);
-                       uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                       float16 first(_first) ;
-                       float16 second(_second);
-                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
-                       vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
+                   //vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
+                   //for (int col = 0 ; col< B_COLS; col+=1) {
+                   //for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
+                   //    uint32_t* val = (uint32_t*)(&regA[idx]);
+                   //    uint16_t _first = (uint16_t)(*val >> 16);
+                   //    uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                   //    float16 first(_first) ;
+                   //    float16 second(_second);
+                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
+                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
 
-                       //uint32_t* val = (uint32_t*)(&regB[idx]);
-                       //uint16_t _first = (uint16_t)(*val >> 16);
-                       //uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                       //float16 first = float16(_first);
-                       //float16 second = float16(_second);
-                       //vx_printf("(%d, %d) regB = %f\n", col, idx, first.to_float32());
-                       //vx_printf("(%d, %d) regB = %f\n", col, idx+1, second.to_float32());
-                   }
-                   }
-                   for (int i = 0 ; i < A_ROWS; i++) {
-                       //print regC
-                       for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
-                           vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
-                       }
-                   }
+                   //    //uint32_t* val = (uint32_t*)(&regB[idx]);
+                   //    //uint16_t _first = (uint16_t)(*val >> 16);
+                   //    //uint16_t _second = (uint16_t)(*val & 0xFFFF);
+                   //    //float16 first = float16(_first);
+                   //    //float16 second = float16(_second);
+                   //    //vx_printf("(%d, %d) regB = %f\n", col, idx, first.to_float32());
+                   //    //vx_printf("(%d, %d) regB = %f\n", col, idx+1, second.to_float32());
+                   //}
+                   //}
+                   //for (int i = 0 ; i < A_ROWS; i++) {
+                   //    //print regC
+                   //    for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
+                   //        vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
+                   //    }
+                   //}
 
                    //#endif
 

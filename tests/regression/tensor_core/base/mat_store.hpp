@@ -74,16 +74,15 @@ template <typename T, int OP_size, int Res_size,int THREAD_N , // based on numbe
     int NUM_LANES,
     int NUM_ROWS = 1,
     int OUTER_COLS = 1,
-    int WARP_GROUP_SIZE = 1,
+    int WARPGROUP_SIZE = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void tc_store_wg(T* ptr, T* reg, const int warp_id, const int thread_id, const int MAT_M, const int MAT_N) {
-    constexpr int wg_idx = warp_id % WARP_GROUP_SIZE;
+    const int wg_idx = warp_id % WARPGROUP_SIZE;
     if (wg_idx ==0) {
         tc_store<T, OP_size,Res_size,THREAD_N, THREAD_GROUP_SIZE,NUM_LANES,NUM_ROWS,OUTER_COLS,layout >(ptr, reg, thread_id,  MAT_M, MAT_N);
     }
 }
-
 
 
 #endif

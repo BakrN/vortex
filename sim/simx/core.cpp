@@ -91,6 +91,8 @@ Core::Core(const SimContext& ctx,
   tc_config.input_mat_buf_depth = TC_MAT_BUF_DEPTH;
   tc_config.output_fifo_size    = TC_OUTPUT_FIFO_SIZE;
   tc_config.execution_latency   = TC_EXECUTION_LAT;
+  tc_config.num_tile_regs       = TC_NUM_TILE_REGS;
+  tc_config.num_tile_bufs       = TC_NUM_TILE_BUFS;
 
   exe_units_.at((int)ExeType::TC)  = SimPlatform::instance().create_object<TimingTensorCore>(this, tc_config);
   func_tensor_core_ = std::make_unique<FuncTensorCore>(this, tc_config);
@@ -259,13 +261,15 @@ void Core::issue() {
       continue;
     auto trace = operand->Output.front();
     // For functional testing only
-    if (trace->exe_type == ExeType::TC)  {
+    /*if (trace->exe_type == ExeType::TC)  {
         committed_instrs_++;
-        scoreboard_.release(trace);
+        if (trace->wb ) {
+            scoreboard_.release(trace);
+        }
         delete trace;
         operand->Output.pop();
         continue;
-    }
+    }*/
     // for functional testing only
     if (dispatchers_.at((int)trace->exe_type)->push(i, trace)) {
       operand->Output.pop();

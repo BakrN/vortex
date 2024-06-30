@@ -27,6 +27,24 @@ struct kernel_arg_t{
     int num_tasks;
 };
 
+struct coop_kernel_arg_t{
+    unsigned int A_addr;
+    unsigned int B_addr;
+    unsigned int C_addr;
+    unsigned int D_addr;
+
+    int A_layout;
+    int B_layout;
+    int C_layout;
+    int D_layout;
+
+    unsigned int M_;
+    unsigned int N_;
+    unsigned int K_;
+
+    int num_tasks;
+};
+
 struct float16 {
   unsigned short sign : 1;
   unsigned short exponent : 5;

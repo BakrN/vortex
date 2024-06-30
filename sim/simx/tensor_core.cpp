@@ -1,5 +1,6 @@
 #include "tensor_core.h"
 #include "core.h"
+#include "tc_helper.h"
 #include "types.h"
 
 // TODO: Internal accumulation and stepping (just add it to c fifo in model and have a flag option in the  trace_q thing)
@@ -20,7 +21,7 @@ TensorCore::TensorCore(vortex::Core* _core, Config_t config) :  m_config(config)
         a[wid].resize(config.num_threads);
         for (int lane = 0; lane < (int)config.num_threads; lane++) {
             FIFO<std::vector<uint32_t>> b_fifo(config.thread_n) ;
-            FIFO<uint32_t> c_fifo(config.thread_n) ;
+            FIFO<std::tuple<bool, uint32_t*, uint32_t>> c_fifo(config.thread_n) ;
             b[wid].push_back(b_fifo) ;
             c[wid].push_back(c_fifo) ;
             a[wid][lane].resize(config.thread_group_size,0);
@@ -29,9 +30,9 @@ TensorCore::TensorCore(vortex::Core* _core, Config_t config) :  m_config(config)
 
     tile_reg.resize(config.num_threads);
     for (int lane = 0 ; lane < (int)m_config.num_threads;lane++) {
-        tile_reg[lane].resize(config.num_tile_regs);
+        tile_reg[lane].resize(config.num_tile_bufs);
         for (int buf= 0 ; buf< (int)config.num_tile_bufs; buf++) {
-            tile_reg[lane][buf].resize(config.num_tile_regs) ;
+            tile_reg[lane][buf].resize(config.num_tile_regs,0) ;
         }
     }
 }
@@ -44,7 +45,7 @@ uint32_t TensorCore::dot_product(Precision input_precision, Precision output_pre
         case (Precision::FP16) : {
             if (output_precision == Precision::FP32) {
                 float sum =0.0f;
-                std::cout << "Dot product: \n" ;
+                //std::cout << "Dot product: \n" ;
                 for (size_t i = 0 ; i < a.size();i++) {
                     uint16_t a_0= (uint16_t)(a[i] & 0xFFFF);
                     uint16_t a_1= (uint16_t)((a[i] & 0xFFFF0000) >> 16);
@@ -54,17 +55,17 @@ uint32_t TensorCore::dot_product(Precision input_precision, Precision output_pre
 
                     float af_0 = float16(a_0).to_float32();
                     float af_1 = float16(a_1).to_float32();
-                    std::cout  << " A: " << af_0 << " , " << af_1 << std::endl;
+                    //std::cout  << " A: " << af_0 << " , " << af_1 << std::endl;
 
                     float bf_0 = float16(b_0).to_float32();
                     float bf_1 = float16(b_1).to_float32();
 
-                    std::cout  << "B: " << bf_0 << " , " << bf_1 << std::endl;
+                    //std::cout  << "B: " << bf_0 << " , " << bf_1 << std::endl;
 
                     sum += af_0 * bf_0 + af_1*bf_1;
                 }
                 sum += uint32_to_float32(c);
-                std::cout  << "C: " << uint32_to_float32(c) << std::endl;
+                //std::cout  << "C: " << uint32_to_float32(c) << std::endl;
                 return float32_to_uint32(sum);
             } else {
 
@@ -82,13 +83,12 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
     auto& wid = trace->wid ;
 
     bool spaceToAccept = true;
-    spaceToAccept &= !(c[wid][0].isFull() && ((trace->tc_type & 0x000F) <3)) /*acc from reg*/;
-    spaceToAccept &= !(b[wid][0].isFull() && (trace->tc_type & 0x00F0) == vortex::TCOpType::NORMAL_LOAD);
+    spaceToAccept &= c[wid][0].isEmpty() || (!c[wid][0].isFull() && ((trace->tc_type & 0x00F0) == vortex::TCOpType::C_ONLY))/*acc from reg*/;
+    //spaceToAccept &= !(b[wid][0].isFull() && (trace->tc_type & 0x00F0) == vortex::TCOpType::NORMAL_LOAD);
     if (!spaceToAccept) {
         return false;
     }
-    std::cout << "Accepted input: " << *trace << std::endl;
-    bool tile_acc = false;
+    //std::cout << "Accepted input: " << *trace << std::endl;
     if ((trace->tc_type & 0x00F0)== vortex::TCOpType::NORMAL_LOAD) {
         for (size_t tid = 0; tid < m_config.num_threads; tid++) {
             uint32_t val ;
@@ -96,89 +96,109 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
 
             if ((trace->tc_type & 0x000F) < 3)  { // acc reg  file
                 val = reg_file[tid][trace->rsrc3] & 0xFFFFFFFF;
-            } else {
-                tile_acc = true;
-            }
-            if (!tile_acc) {
-                std::cout << "tid(" << tid << ") reg("<< trace->rsrc3 << ") Adding c: " << uint32_to_float32(val) << std::endl;
-                c[wid][tid].enqueue(val);
-            } else {
+                //std::cout << "tid(" << tid << ") reg("<< trace->rsrc3 << ") Adding c: " << uint32_to_float32(val) << std::endl;
+                c[wid][tid].enqueue({false, nullptr, val});
 
-                std::cout << "tid(" << tid << ") Adding c from regs: ";
-                for (int i =0 ; i < m_config.thread_n; i++) {
+            } else {// acc is buffer
+
+                //std::cout << "tid(" << tid << ") Adding c from tiles: ";
+                // if
+                int loop_bound = ((trace->tc_type & 0x000F) == vortex::TCOpType::ACC_BUF_WB_BUF) ? m_config.thread_n : 1; // only add all cs if its a acc buf and wb buf
+                for (int i =0 ; i < loop_bound; i++) {
                     //
-                    auto reg = trace->rsrc3; // IN hw value encoded in imm
-                    auto buf = trace->wid/ m_config.num_tile_bufs;
-                    val = tile_reg[tid][buf][reg+1]; // do this thread_n number of times
-                    c[wid][tid].enqueue(val);
-                    std::cout << uint32_to_float32(val) << " , ";
+                    int reg = trace->rsrc3+i; // IN hw value encoded in imm
+                    int buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
+                    c[wid][tid].enqueue({true, &(tile_reg[tid][buf][reg]),0});
+                    //std::cout << "buf: " << buf << " reg: " << reg << " value: " << uint32_to_float32(tile_reg[tid][buf][reg]) << std::endl;
                 }
-                std::cout << std::endl;
+                //std::cout << std::endl;
             }
 
             size_t row = tid / m_config.thread_group_size * m_config.thread_group_size; // shared between all threads in threadgroup
             size_t start_col = (tid % m_config.thread_group_size)*m_config.thread_n * m_config.thread_group_size ; // output col
             if constexpr (FUNC){
-                std::cout << "tid(" << tid << ") Adding a row: ";
+                //std::cout << "tid(" << tid << ") Adding a row: ";
                 for (size_t i = 0 ; i < m_config.thread_group_size; i++) {
                     uint32_t a_val = (uint32_t)(reg_file[row+i][trace->rsrc1] & 0xFFFFFFFF);
                     a[wid][tid][i] = a_val;
-                    std::cout << a_val << " , ";
+                    //std::cout << a_val << " , ";
                 }
-                std::cout << std::endl;
+                //std::cout << std::endl;
             }
 
             for (size_t col = 0 ; col < m_config.thread_n; col++) {
                 std::vector<uint32_t> b_vals(m_config.thread_group_size);
                 if constexpr (FUNC){
-                    std::cout << "tid(" << tid << ") reg(" << trace->rsrc2 << ") Adding b col: ";
+                    //std::cout << "tid(" << tid << ") reg(" << trace->rsrc2 << ") Adding b col: ";
                     for (size_t i = 0 ; i < m_config.thread_group_size; i++) {
                         uint32_t b_val = (uint32_t)(reg_file[start_col+i+col*m_config.thread_group_size][trace->rsrc2] & 0xFFFFFFFF);
-                        std::cout << b_val << " , ";
+                        //std::cout << b_val << " , ";
                         b_vals[i]  = b_val;
                     }
-                    std::cout << std::endl;
+                    //std::cout << std::endl;
                 }
 
                 b[wid][tid].enqueue(std::move(b_vals));
-                std::cout << "Test printing b values: " ;
+                //std::cout << "Test printing b values: " ;
                 for (int i = 0 ; i < m_config.thread_group_size; i++) {
-                    std::cout << b[wid][tid].front()[i]<<  " , " ;
+                    //std::cout << b[wid][tid].front()[i]<<  " , " ;
 
                 }
-                std::cout << std::endl;
+                //std::cout << std::endl;
             }
         }
     } else{  // C load only (never happening if it's an accumulate buf(except final flush?)) ... have sepeate flush operation
         for (size_t tid =0 ; tid < m_config.num_threads;tid++) {
-            uint32_t val ;
             if constexpr (FUNC){
-                val = core->warps_[wid]->freg_file_[tid][trace->rsrc1] & 0xFFFFFFFF;
-                std::cout << "tid(" << tid << ") Adding c: " << val << std::endl;
+
+                if ((trace->tc_type & 0x000F) < 3) { // reg acc
+                    uint32_t val = core->warps_[wid]->freg_file_[tid][trace->rsrc1] & 0xFFFFFFFF;
+                    c[wid][tid].enqueue({false, nullptr, val});
+                } else {  // c_only in tc_mma_wg_after from buf (ACC_BUF_WB_REG)
+                    auto reg = trace->rsrc1;
+                    auto buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
+                    c[wid][tid].enqueue({true, &(tile_reg[tid][buf][reg]), 0});
+                }
+
+                //std::cout << "tid(" << tid << ") Adding c_only: " << val << std::endl;
+            } else {
+                c[wid][tid].enqueue({}); // timing enqueue whatever
             }
-            c[wid][tid].enqueue(val);
+
         }
     }
-    if (!tile_acc ) {
-        WritebackInfo info;
-        info.reg_wb = true;
-        info.trace = trace;
-        trace_q[wid].push(info);
-    } else {
-        for (int i = 0 ; i < (int)m_config.thread_n; i++) {
-            WritebackInfo info;
-            info.reg_wb = false;
+    WritebackInfo info;
+    info.reg_wb = trace->wb;
+    if (!info.reg_wb){
+        if constexpr (!FUNC) {
+            core->committed_instrs_++;
+        }
+        // if acc buf
+        int loop_bound = (trace->tc_type & 0x000F) == vortex::TCOpType::ACC_BUF_WB_BUF ? m_config.thread_n : 1;
+
+        for (int i = 0 ; i < loop_bound; i++) {
             info.trace= nullptr;
-            info.tile_reg = trace->rsrc3 + i; // wb to tile reg
-            info.tile_buf = trace->wid / m_config.num_tile_bufs;
+            info.tile_reg = trace->rdest +i;
+            info.tile_buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
+
+            if (loop_bound >1) {
+                //std::cout << "Writing back to tile buf: " << info.tile_buf << " tile reg: " << info.tile_reg << std::endl;
+            }
             trace_q[wid].push(info);
         }
+        if constexpr (!FUNC) {
+            delete trace;
+        }
+    } else {
+        info.trace = trace;
+        trace_q[wid].push(info);
     }
+
     return true;
 }
 
 template <bool FUNC>
-void TensorCore::compute() { // this step is only for functional  portion
+bool TensorCore::compute() { // this step is only for functional  portion
     for (int wid = 0  ; wid  < MAX_NUM_WARPS; wid++) {
         bool fired = false;
 
@@ -186,24 +206,26 @@ void TensorCore::compute() { // this step is only for functional  portion
             continue;
         }
         auto wb_info = trace_q[wid].front();
-        if (!c[wid][0].isEmpty() && (FUNC || (wb_info.reg_wb && out_fifo_credits) || !wb_info.reg_wb)) {
+        if (!c[wid][0].isEmpty() && (FUNC || ((wb_info.reg_wb && out_fifo_credits) || !wb_info.reg_wb))) {
             fired = true;
             if constexpr (!FUNC){
                 out_fifo_credits -= trace_q[wid].front().reg_wb;
+                mac_fire->addValue(1) ;
             }
             for (size_t tid = 0 ; tid < m_config.num_threads; tid++) {
                 if constexpr(FUNC) {
                     auto& b_vals = b[wid][tid].front();
-                    auto c_val = c[wid][tid].front();
+                    auto [c_tile_src, c_val_ptr, c_reg_val] = c[wid][tid].front();
+                    uint32_t c_val = c_tile_src ? *c_val_ptr : c_reg_val;
                     auto result = dot_product(Precision::FP16, Precision::FP32, a[wid][tid], b_vals, c_val);
-                    uint64_t res = nan_box(result);
                     if (wb_info.reg_wb) {
-                        core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res; // this line might be error prone... assumused rsrcx is initialized to -1 if unused
-                        std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
-                        << " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
-                } else {
-                    tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = result;
-                }
+                        uint64_t res = nan_box(result);
+                        core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
+                        //std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
+                        //<< " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
+                    } else {
+                        tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = result;
+                    }
                 }
                 b[wid][tid].dequeue();
                 c[wid][tid].dequeue();
@@ -213,13 +235,18 @@ void TensorCore::compute() { // this step is only for functional  portion
             if constexpr (!FUNC) {
                 if (wb_info.reg_wb){
                     commit_fifo.push({m_cycle+m_config.execution_latency, wb_info.trace});
+                    //std::cout << "Queue trace: " << *(wb_info.trace) << std::endl;
                 }
             }
         }
         if (fired) {
+            if (FUNC) {
+                return true;
+            }
             break;
         }
     }
+    return false;
 }
 
 vortex::pipeline_trace_t* TensorCore::queueCommit() {
@@ -250,16 +277,17 @@ FuncTensorCore::~FuncTensorCore(){
 }
 
 void FuncTensorCore::execute(vortex::pipeline_trace_t* trace){
-    std::cout << "FUNC: Handling input" << std::endl;
+    //std::cout << "FUNC: Handling input" << std::endl;
     bool accepted =handleInput<true>(trace);
     if (!accepted) {
-        std::cout << "Failed to accept \n"  << std::endl;
+        //std::cout << "Failed to accept \n"  << std::endl;
     }
-    std::cout << "FUNC: Compute" << std::endl;
-    compute<true>();
+    //std::cout << "FUNC: Compute" << std::endl;
+    while(compute<true>());
 }
 
 TimingTensorCore::TimingTensorCore(const SimContext& ctx, vortex::Core*c, Config_t config) : TensorCore(c, config), vortex::ExeUnit(ctx, c, "TensorCore") {
+    mac_fire = SimPlatform::instance().get_stat_engine().registerStatistic(c->name()+".tensor_core.mac_fire");
 }
 
 TimingTensorCore::~TimingTensorCore(){
@@ -269,7 +297,7 @@ TimingTensorCore::~TimingTensorCore(){
 void TimingTensorCore::tick() {
     auto* trace=  queueCommit();
     if (trace) {
-        Outputs.at(trace->wid).send(trace, 1) ;
+        Outputs.at(trace->wid % ISSUE_WIDTH).send(trace, 1) ;
     }
     for (int i = 0 ; i < ISSUE_WIDTH ; i++) {
         auto& input = Inputs.at(i) ;
@@ -282,6 +310,7 @@ void TimingTensorCore::tick() {
         }
     }
     compute<false>();
+    m_cycle += 1;
 }
 
 
