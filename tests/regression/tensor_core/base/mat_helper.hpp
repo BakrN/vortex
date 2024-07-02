@@ -15,6 +15,15 @@ inline void unrolled_for_func(Func&& func, Args&&... args)  {
 }
 
 
+template<int i, int i_end, template<int, int...> class Func, int... Is>
+inline void unrolled_for_func_it(float*& reg) {
+    if constexpr (i < i_end) {
+        Func<i, Is...>{}(reg);
+        unrolled_for_func_it<i + 1, i_end, Func, Is...>(reg);
+    }
+}
+
+
 //template<int i, int i_end, typename Func, typename... Args>
 //inline void unrolled_for_func(Func&& func, Args&&... args) {
 //    if constexpr (i < i_end) {

@@ -106,37 +106,38 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
 
-           load_fragment<MatT::C>(C_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
+          vx_pred(warp_id % WARP_GROUP_SIZE == 0 ,-1) ; // no need to split
+          //if (warp_id % WARP_GROUP_SIZE == 0) {
+               load_fragment<MatT::C>(C_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
+               float _tmpA[A_ROWS*K_MULTIPLE] = {0};
+               float _tmpB[B_COLS*K_MULTIPLE] = {0};
+              //tc_mma_acc_reg_wb_buf >(_tmpA, _tmpB, regC) ;
+               tc_mma_acc_reg_wb_buf<A_ROWS, B_COLS,  TC_THREAD_N>(_tmpA, _tmpB, regC);
+          //}
+          vx_tmc(-1);
+          vx_barrier(warp_group, WARP_GROUP_SIZE);
 
-           load_fragment<MatT::A>(A_ptr, (float*)regA, warp_id, thread_id, MAT_M, MAT_K);
-           load_fragment<MatT::B>(B_ptr, (float*)regB, warp_id, thread_id, MAT_N, MAT_K);
 
-           tc_mma_wg_before<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N, WARP_GROUP_SIZE>(regA, regB, regC, warp_id, warp_group*2);
-           A_ptr+=tc_k * PREC_RATIO; // assuming row major
-           B_ptr+=tc_k * PREC_RATIO; // assumming col_major
-
-
-           for (int k = tc_k; k < (MAT_K-tc_k); k+=tc_k*WARP_GROUP_SIZE){
+           for (int k = 0; k < (MAT_K); k+=tc_k*WARP_GROUP_SIZE){
 
                load_fragment<MatT::A>(A_ptr, (float*)regA, warp_id, thread_id, MAT_M, MAT_K);
 
                load_fragment<MatT::B>(B_ptr, (float*)regB, warp_id, thread_id, MAT_N, MAT_K);
 
-               // normal
-               tc_mma_wg<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>((float*)regA, (float*)regB);
+               tc_mma_acc_buf_wb_buf<A_ROWS, B_COLS,  TC_THREAD_N>(regA, regB);
 
                A_ptr+=tc_k * WARP_GROUP_SIZE * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * WARP_GROUP_SIZE * PREC_RATIO; // assumming col_major
            }
 
-           load_fragment<MatT::A>(A_ptr, (float*)regA, warp_id, thread_id, MAT_M, MAT_K);
-           load_fragment<MatT::B>(B_ptr, (float*)regB, warp_id, thread_id, MAT_N, MAT_K);
-           tc_mma_wg_after<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N, WARP_GROUP_SIZE>(regA, regB, warp_id , warp_group*2+1, regC);
+           vx_barrier(warp_group,WARP_GROUP_SIZE);
+           vx_pred(warp_id % WARP_GROUP_SIZE == 0 ,-1) ; // no need to split
+           //if (warp_id % warp_group == 0 ) {
+                tc_mma_acc_buf_wb_reg<A_ROWS, B_COLS,  TC_THREAD_N> (_tmpA, _tmpB, regC) ;
+                tc_store_wg<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS, WARP_GROUP_SIZE>((float*)D_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
+          // }
+           vx_tmc(-1);
 
-           A_ptr+=tc_k * PREC_RATIO; // assuming row major
-           B_ptr+=tc_k * PREC_RATIO; // assumming col_major
-
-           tc_store_wg<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS, WARP_GROUP_SIZE>((float*)D_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }

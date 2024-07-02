@@ -23,44 +23,8 @@ enum class LoadMode : int {
     C_ONLY = 1  // load only C (post first step)
 };
 
-template<OperationMode mode>
-struct OpModeSelect;
-
-
-template<>
-struct OpModeSelect<OperationMode::ACC_REG_WB_REG> {
-    using C_t = float*;
-    using D_t = float*;
-
-    static constexpr float* D_default = nullptr;
-};
-
-template<>
-struct OpModeSelect<OperationMode::ACC_REG_WB_BUF> {
-    using C_t = float*;
-    using D_t = int;
-    static constexpr D_t D_default = 0;
-};
-
-template<>
-struct OpModeSelect<OperationMode::ACC_BUF_WB_BUF> {
-    using C_t = int ;
-    using D_t = int ;
-    static constexpr D_t D_default = 0;
-};
-
-template<>
-struct OpModeSelect<OperationMode::ACC_BUF_WB_REG> {
-    using C_t = int;
-    using D_t = float*;
-    static constexpr D_t D_default = nullptr;
-};
-
-
-
-
-template <OperationMode mode, LoadMode load>
-inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typename OpModeSelect<mode>::D_t D = OpModeSelect<mode>::D_default){
+template <OperationMode mode, LoadMode load, int C_acc=0, int D_acc=0>
+inline void mma (float* A, float* B, float* C=nullptr, float*  D = nullptr){
     if constexpr(mode == OperationMode::ACC_REG_WB_REG){
         if constexpr (load == LoadMode::NORMAL) {
             asm volatile(".insn r4 %[EXT], %[func3], %[func2], %[rd], %[rs1], %[rs2], %[rs3]":
@@ -88,13 +52,13 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
         if constexpr( mode == OperationMode::ACC_BUF_WB_BUF) {
 
             asm volatile(".insn r4 %[EXT], %[func3], %[func2], f%[rd], %[rs1], %[rs2], f%[rs3]"::
-                [rd] "i" (D) ,
+                [rd] "i" (D_acc) ,
                 [EXT] "i" (TC_EXT) ,
                 [func3] "i" ((int)load),
                 [func2] "i" ((int)(mode)),
                 [rs1] "f" (*A),
                 [rs2] "f" (*B),
-                [rs3] "i" (C)
+                [rs3] "i" (C_acc)
             );
         } else {
             if constexpr(mode == OperationMode::ACC_BUF_WB_REG) {
@@ -106,7 +70,7 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
                         [func2] "i" ((int)(mode)),
                         [rs1] "f" (*A),
                         [rs2] "f" (*B),
-                        [rs3] "i" (C)
+                        [rs3] "i" (C_acc)
                     );
                 } else {
                     asm volatile(".insn r4 %[EXT], %[func3], %[func2], %[rd], f%[rs1], f%[rs2], f%[rs3]":
@@ -116,7 +80,7 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
                         [func2] "i" ((int)(mode)),
                         [rs1] "i" (0),
                         [rs2] "i" (0),
-                        [rs3] "i" (C)
+                        [rs3] "i" (C_acc)
                     );
                 }
             } else { // OperationMode::ACC_REG_WB_BUF
@@ -125,7 +89,7 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
 
                 if constexpr (load == LoadMode::NORMAL) {
                     asm volatile(".insn r4 %[EXT], %[func3], %[func2], f%[rd], %[rs1], %[rs2], %[rs3]"::
-                        [rd] "i" (D),
+                        [rd] "i" (D_acc),
                         [EXT] "i" (TC_EXT) ,
                         [func3] "i" ((int)load),
                         [func2] "i" ((int)(mode)),
@@ -136,7 +100,7 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
 
                 } else {
                     asm volatile(".insn r4 %[EXT], %[func3], %[func2], f%[rd], f%[rs1], f%[rs2], %[rs3]"::
-                        [rd] "i" (D),
+                        [rd] "i" (D_acc),
                         [EXT] "i" (TC_EXT) ,
                         [func3] "i" ((int)load),
                         [func2] "i" ((int)(mode)),
@@ -155,14 +119,14 @@ inline void mma (float* A, float* B, typename OpModeSelect<mode>::C_t C, typenam
 // include a unrolled function for outer product as well
 
 
-template <int a_rows, int b_cols, int k_multiple, int thread_n, OperationMode mode=OperationMode::ACC_REG_WB_REG, bool in_place=true, int cur_row =0 , int cur_col=0>
-inline void tc_mma (float* regA, float* regB , typename OpModeSelect<mode>::C_t regC ,  typename OpModeSelect<mode>::D_t regD= OpModeSelect<mode>::D_default) {
+template <int a_rows, int b_cols, int k_multiple, int thread_n,  bool in_place=true, int cur_row =0 , int cur_col=0>
+inline void tc_mma (float* regA, float* regB , float* regC ,  float* regD= nullptr) {
     // if it's equal to 1 then just store back directly
     static_assert(thread_n * a_rows * b_cols <= 32 , "Can only address up to 32 tile regs (5 bits) so total regs inside must not exceed that");
     float* s_regA = regA + cur_row;
     float* s_regB = regB + cur_col;
-    typename OpModeSelect<mode>::C_t s_regC = regC + thread_n*cur_row+ cur_col*a_rows*thread_n;
-    typename OpModeSelect<mode>::D_t s_regD = regD;
+    float* s_regC = regC + thread_n*cur_row+ cur_col*a_rows*thread_n;
+    float* s_regD = regD;
 
 
     if constexpr (!in_place) {
@@ -172,25 +136,22 @@ inline void tc_mma (float* regA, float* regB , typename OpModeSelect<mode>::C_t 
     // unroll over k
     unrolled_for_func<0, k_multiple>([&](){
         if constexpr (in_place) {
-            mma<mode, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regC) ;
+            mma<OperationMode::ACC_REG_WB_REG, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regC) ;
             s_regC++;
         }else{
-            mma<mode, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regD) ;
+            mma<OperationMode::ACC_REG_WB_REG, LoadMode::NORMAL>(s_regA, s_regB, s_regC, s_regD) ;
             s_regC++;
             s_regD++;
         }
 
-        if constexpr(mode != OperationMode::ACC_BUF_WB_BUF) {
-            unrolled_for_func<0,thread_n-1> ([&](){
-                    if constexpr (in_place) {
-                        mma<mode, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regC); s_regC++;
-
-                    } else {
-                        mma<mode, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regD);
-                        s_regC++; s_regD++;
-                    }
-            });
-        }
+        unrolled_for_func<0,thread_n-1> ([&](){
+            if constexpr (in_place) {
+                mma<OperationMode::ACC_REG_WB_REG, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regC); s_regC++;
+            } else {
+                mma<OperationMode::ACC_REG_WB_REG, LoadMode::C_ONLY>(nullptr, nullptr, s_regC, s_regD);
+                s_regC++; s_regD++;
+            }
+        });
         s_regA += a_rows;
         s_regB += b_cols;
 
@@ -204,54 +165,143 @@ inline void tc_mma (float* regA, float* regB , typename OpModeSelect<mode>::C_t 
 
     if constexpr (cur_row  < a_rows -1) {
         if constexpr  (cur_col < b_cols -1) {
-            tc_mma<a_rows, b_cols, k_multiple, thread_n, mode, in_place, cur_row , cur_col+1>(regA, regB, regC, regD);
+            tc_mma<a_rows, b_cols, k_multiple, thread_n, in_place, cur_row , cur_col+1>(regA, regB, regC, regD);
         } else {
-            tc_mma<a_rows, b_cols, k_multiple, thread_n, mode, in_place, cur_row+1, 0>(regA, regB, regC, regD);
+            tc_mma<a_rows, b_cols, k_multiple, thread_n, in_place, cur_row+1, 0>(regA, regB, regC, regD);
         }
 
     } else {
         if constexpr (cur_col < b_cols -1 ) {
-            tc_mma<a_rows, b_cols, k_multiple, thread_n, mode, in_place, cur_row , cur_col+1>(regA, regB, regC, regD);
+            tc_mma<a_rows, b_cols, k_multiple, thread_n, in_place, cur_row , cur_col+1>(regA, regB, regC, regD);
         }
     }
 }
 
 
-// Cooperative warp execution:
 
-template <int a_rows, int b_cols, int k_multiple, int thread_n, int warp_group_size, bool in_place=true, int cur_row =0 , int cur_col=0>
-inline void tc_mma_wg_before(float* regA, float* regB , float*regC , const int warp_id, const int before_barrier_id) {
-    const int wg_idx = warp_id % warp_group_size;
-    if (wg_idx == 0) {
-        tc_mma<a_rows, b_cols, k_multiple, thread_n, OperationMode::ACC_REG_WB_BUF, false> (regA, regB, regC, 0);
-        vx_barrier(before_barrier_id, warp_group_size);
+
+template <int a_rows, int b_cols, int thread_n, int cur_row =0 , int cur_col=0>
+void inline tc_mma_acc_buf_wb_buf(float* regA, float*regB) {
+    float* s_regA = regA + cur_row;
+    float* s_regB = regB + cur_col;
+    constexpr int C = thread_n*cur_row+ cur_col*a_rows*thread_n;
+
+    mma<OperationMode::ACC_BUF_WB_BUF, LoadMode::NORMAL, C, C>(s_regA, s_regB) ;
+    if constexpr (cur_row  < a_rows -1) {
+        if constexpr  (cur_col < b_cols -1) {
+            tc_mma_acc_buf_wb_buf<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB);
+        } else {
+            tc_mma_acc_buf_wb_buf<a_rows, b_cols,  thread_n,   cur_row+1, 0>(regA, regB);
+        }
     } else {
-        vx_barrier(before_barrier_id, warp_group_size);
-        //tc_mma<a_rows, b_cols, k_multiple, thread_n, OperationMode::ACC_BUF_WB_BUF, true> (regA, regB, 0);
+        if constexpr (cur_col < b_cols -1 ) {
+            tc_mma_acc_buf_wb_buf<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB);
+        }
     }
 }
 
-template <int a_rows, int b_cols, int k_multiple, int thread_n>
-inline void tc_mma_wg(float* regA, float* regB ) {
-    tc_mma<a_rows, b_cols, k_multiple, thread_n, OperationMode::ACC_BUF_WB_BUF, false>(regA, regB, 0);
+
+template <int loop, int a_rows, int b_cols,  int thread_n, int cur_row , int cur_col>
+struct UnrollAccBufWbReg {
+    inline void operator()(float*& regD) {
+        constexpr int C_tn = thread_n*cur_row+ cur_col*a_rows*thread_n + loop+1;
+        mma<OperationMode::ACC_BUF_WB_REG, LoadMode::C_ONLY, C_tn>(nullptr, nullptr, nullptr, regD) ;
+        regD++;
+    }
+};
+
+
+template <int a_rows, int b_cols,  int thread_n, int cur_row =0 , int cur_col=0>
+void inline tc_mma_acc_buf_wb_reg(float* regA, float* regB, float* regD){
+    float* s_regA = regA + cur_row;
+    float* s_regB = regB + cur_col;
+    float* s_regD = regD + thread_n*cur_row+ cur_col*a_rows*thread_n;
+    constexpr auto C = thread_n*cur_row+ cur_col*a_rows*thread_n;
+
+    mma<OperationMode::ACC_BUF_WB_REG, LoadMode::NORMAL, C>(s_regA, s_regB, nullptr, s_regD) ;
+    s_regD++;
+    unrolled_for_func_it<0, thread_n-1, UnrollAccBufWbReg,a_rows,b_cols,thread_n,cur_row,cur_col>(s_regD);
+
+    if constexpr (cur_row  < a_rows -1) {
+        if constexpr  (cur_col < b_cols -1) {
+            tc_mma_acc_buf_wb_reg<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB, regD);
+        } else {
+            tc_mma_acc_buf_wb_reg<a_rows, b_cols,  thread_n,   cur_row+1, 0>(regA, regB, regD);
+        }
+    } else {
+        if constexpr (cur_col < b_cols -1 ) {
+            tc_mma_acc_buf_wb_reg<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB,regD);
+        }
+    }
 }
 
-template <int a_rows, int b_cols, int k_multiple, int thread_n, int warp_group_size>
+
+
+template <int loop, int a_rows, int b_cols,  int thread_n, int cur_row , int cur_col>
+struct UnrollAccRegWbBuf {
+    inline void operator()(float*& regC) {
+        constexpr int D_tn = thread_n*cur_row+ cur_col*a_rows*thread_n + loop+1;
+        mma<OperationMode::ACC_REG_WB_BUF, LoadMode::C_ONLY, 0,D_tn>(nullptr, nullptr, regC) ;
+        regC++;
+    }
+};
+
+template <int a_rows, int b_cols, int thread_n, int cur_row =0 , int cur_col=0>
+void inline tc_mma_acc_reg_wb_buf(float* regA, float* regB, float* regC){
+    float* s_regA = regA + cur_row;
+    float* s_regB = regB + cur_col;
+    float* s_regC = regC + thread_n*cur_row+ cur_col*a_rows*thread_n;
+
+    constexpr int D = thread_n*cur_row+ cur_col*a_rows*thread_n;
+
+    mma<OperationMode::ACC_REG_WB_BUF, LoadMode::NORMAL, 0,D>(s_regA, s_regB, s_regC) ;
+    s_regC++;
+    unrolled_for_func_it<0, thread_n-1, UnrollAccRegWbBuf,a_rows,b_cols,thread_n,cur_row,cur_col>(s_regC);
+
+    if constexpr (cur_row  < a_rows -1) {
+        if constexpr  (cur_col < b_cols -1) {
+            tc_mma_acc_reg_wb_buf<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB, regC);
+        } else {
+            tc_mma_acc_reg_wb_buf<a_rows, b_cols,  thread_n,   cur_row+1, 0>(regA, regB, regC);
+        }
+    } else {
+        if constexpr (cur_col < b_cols -1 ) {
+            tc_mma_acc_reg_wb_buf<a_rows, b_cols,  thread_n,   cur_row , cur_col+1>(regA, regB, regC);
+        }
+    }
+
+
+}
+
+// Cooperative warp execution:
+
+template <int a_rows, int b_cols, int thread_n, int warp_group_size, bool in_place=true, int cur_row =0 , int cur_col=0>
+inline void tc_mma_wg_before(float* regA, float* regB , float*regC , const int warp_id, const int before_barrier_id) {
+    const int wg_idx = warp_id % warp_group_size;
+    if (wg_idx == 0) {
+        tc_mma_acc_reg_wb_buf<a_rows, b_cols,  thread_n>(regA, regB, regC);
+        vx_barrier(before_barrier_id, warp_group_size);
+    } else {
+        vx_barrier(before_barrier_id, warp_group_size);
+        tc_mma_acc_buf_wb_buf<a_rows, b_cols,  thread_n>(regA, regB);
+    }
+}
+
+template <int a_rows, int b_cols, int thread_n, int warp_group_size>
 inline void tc_mma_wg_after(float* regA, float* regB ,const int warp_id, const int after_barrier_id , float* regD){
     const int wg_idx = warp_id % warp_group_size;
     if (wg_idx==0) {
         vx_barrier(after_barrier_id,  warp_group_size);
-        tc_mma<a_rows, b_cols, k_multiple, thread_n, OperationMode::ACC_BUF_WB_REG, false>(regA, regB,0 , regD);
-        //int idx[1] = {1};
-        //float zeroA[a_rows*k_multiple] = {0};
-        //float zeroB[a_rows*k_multiple] = {0};
-        //unrolled_for_func<0, thread_n-1>([&](int* const){
-        //    tc_mma<a_rows, b_cols, k_multiple, thread_n, OperationMode::ACC_BUF_WB_REG, false>(zeroA,zeroB, (*idx)++, regD++);
-        //}, idx) ;
+        tc_mma_acc_buf_wb_reg<a_rows, b_cols,  thread_n>(regA, regB, regD);
     } else {
-        //tc_mma_wg<a_rows, b_cols, k_multiple, thread_n>(regA, regB); // I lag here
+        tc_mma_acc_buf_wb_buf<a_rows, b_cols,  thread_n>(regA, regB);
         vx_barrier(after_barrier_id,  warp_group_size);
     }
 }
+
+
+
+
+
 
 #endif
