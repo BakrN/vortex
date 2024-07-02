@@ -267,7 +267,8 @@ FuncTensorCore::FuncTensorCore( vortex::Core* core, Config_t config) : TensorCor
             .input_mat_buf_depth = 1,
             .output_fifo_size    = 1,
             .execution_latency   = 0 ,
-
+            .num_tile_regs       = config.num_tile_regs,
+            .num_tile_bufs       = config.num_tile_bufs
         } ){
     m_cycle = (uint64_t)(-1);
 }
