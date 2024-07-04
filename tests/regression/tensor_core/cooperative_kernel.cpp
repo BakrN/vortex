@@ -33,7 +33,7 @@ inline void load_fragment(float* ptr , float*reg , const int wid, const int tid,
         if constexpr(T == MatT::B) {
             load_tile_b_wg<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_GROUP_SIZE, NUM_THREADS,K_MULTIPLE,B_COLS,WARP_GROUP_SIZE>(ptr, reg, wid,tid, dim0, dim1) ;
         }  else {
-            load_tile_c_wg<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS, B_COLS,WARP_GROUP_SIZE>(ptr,reg,wid, tid, dim0, dim1) ;
+            load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS, B_COLS>(ptr,reg, tid, dim0, dim1) ;
         }
     }
 }
@@ -106,19 +106,18 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
 
 
-          vx_pred(warp_id % WARP_GROUP_SIZE == 0 ,-1) ; // no need to split
-          //if (warp_id % WARP_GROUP_SIZE == 0) {
-               load_fragment<MatT::C>(C_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
-               float _tmpA[A_ROWS*K_MULTIPLE] = {0};
-               float _tmpB[B_COLS*K_MULTIPLE] = {0};
-              //tc_mma_acc_reg_wb_buf >(_tmpA, _tmpB, regC) ;
-               tc_mma_acc_reg_wb_buf<A_ROWS, B_COLS,  TC_THREAD_N>(_tmpA, _tmpB, regC);
-          //}
-          vx_tmc(-1);
-          vx_barrier(warp_group, WARP_GROUP_SIZE);
+           //if (warp_id % WARP_GROUP_SIZE == 0) {
+           //     load_fragment<MatT::C>(C_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
+           //     float _tmpA[A_ROWS*K_MULTIPLE] = {0};
+           //     float _tmpB[B_COLS*K_MULTIPLE] = {0};
+           //    //tc_mma_acc_reg_wb_buf >(_tmpA, _tmpB, regC) ;
+           //     tc_mma_acc_reg_wb_buf<A_ROWS, B_COLS,  TC_THREAD_N>(_tmpA, _tmpB, regC);
+           //}
+           //vx_barrier(warp_group, WARP_GROUP_SIZE);
 
 
-           for (int k = 0; k < (MAT_K); k+=tc_k*WARP_GROUP_SIZE){
+
+           for (int k = 0; k < (MAT_K); k+=tc_k*WARP_GROUP_SIZE) {
 
                load_fragment<MatT::A>(A_ptr, (float*)regA, warp_id, thread_id, MAT_M, MAT_K);
 
@@ -130,13 +129,17 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                B_ptr+=tc_k * WARP_GROUP_SIZE * PREC_RATIO; // assumming col_major
            }
 
+
            vx_barrier(warp_group,WARP_GROUP_SIZE);
-           vx_pred(warp_id % WARP_GROUP_SIZE == 0 ,-1) ; // no need to split
-           //if (warp_id % warp_group == 0 ) {
+
+           if (warp_id % warp_group == 0) {
+                float _tmpA[A_ROWS*K_MULTIPLE] = {0};
+                float _tmpB[B_COLS*K_MULTIPLE] = {0};
                 tc_mma_acc_buf_wb_reg<A_ROWS, B_COLS,  TC_THREAD_N> (_tmpA, _tmpB, regC) ;
-                tc_store_wg<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS, WARP_GROUP_SIZE>((float*)D_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
-          // }
-           vx_tmc(-1);
+                tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
+           }
+
+
 
            C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR
