@@ -221,6 +221,11 @@ bool TensorCore::compute() { // this step is only for functional  portion
                     if (wb_info.reg_wb) {
                         uint64_t res = nan_box(result);
                         core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
+
+                        if (c_tile_src) {// reset if src acc and wb reg
+                            *c_val_ptr =0 ;
+                        }
+
                         //std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
                         //<< " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
                     } else {
