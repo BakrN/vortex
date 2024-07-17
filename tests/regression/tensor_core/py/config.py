@@ -15,7 +15,7 @@ parser.add_argument('--a_orientation', type=str, default='row_major', choices=['
 parser.add_argument('--b_orientation', type=str, default='col_major', choices=['row_major, col_major'], help='B Matrix internal representation ')
 parser.add_argument('--c_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='C Matrix internal representation ')
 parser.add_argument('--d_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='D Matrix internal representation ')
-parser.add_argument('--generate_gemm', help="generate a new gemm", action='store_false') 
+parser.add_argument('--generate_gemm', help="generate a new gemm", action='store_false')
 
 # Vortex configurtion
 parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of threads in system')
@@ -114,7 +114,7 @@ print(args)
 
 # Print Matrices
 
-if args["generate_gemm"]: 
+if args["generate_gemm"]:
     A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
     print("----PRINTING A----")
     print(A)
@@ -186,7 +186,7 @@ class GEMMArgs:
         self.a_rows = 0
         self.b_cols = 0
         #
-        self.lsu_lanes =1 
+        self.lsu_lanes =1
     def Dm(self):
         return f"-Dtc_m={self.m}"
     def Dn(self):
@@ -214,7 +214,7 @@ system.b_cols = args["B_COLS"]
 system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
 system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple  # * precision of fp16 (res_size/op_size)
-system.lsu_lanes = min(int(math.ceil(tc.num_threads * (1/system.a_rows + 1/system.b_cols))), tc.num_threads) 
+system.lsu_lanes = min(2**math.ceil(math.log2(tc.num_threads * (1/(system.a_rows) + 1/(system.b_cols*tc.thread_n)))), tc.num_threads)
 print("TC")
 print (tc)
 print("GEMM")
