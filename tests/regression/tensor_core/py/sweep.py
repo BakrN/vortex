@@ -19,7 +19,7 @@ def save_json(file_path, data):
     with open(file_path, 'w') as file:
         json.dump(data, file, indent=4)
 
-parameters = {
+vanilla_parameters = {
     "num_threads": [4, 8, 16, 32],
     "num_dot_units": [1 ,2 , 4, 8]
 }
@@ -45,7 +45,7 @@ def vanilla_sweep():
     json_file_path = args.params_file  # Replace with your JSON file path
     json_data = load_json(json_file_path)
 
-    valid_combinations = parameter_sweep(parameters, is_valid_config)
+    valid_combinations = parameter_sweep(vanilla_parameters, is_valid_config)
 
     for _, combo in enumerate(valid_combinations):
         for key,value in combo.items():
@@ -57,7 +57,7 @@ def vanilla_sweep():
         cwd = os.getcwd()
         out_dir = os.path.join(args.experiment_dir, f"th{json_data['num_threads']}du{json_data['num_dot_units']}")
         os.makedirs(out_dir, exist_ok=True)
-        json_data["define_file"]  = cwd + '/defines.txt' 
+        json_data["define_file"]  = cwd + '/defines.txt'
         # save json file
         output_file_path = out_dir + "/config.json"
         save_json(output_file_path, json_data)

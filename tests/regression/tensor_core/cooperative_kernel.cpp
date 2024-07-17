@@ -54,10 +54,10 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
 
    int num_warp_groups = kernel_arg->num_tasks/(WARP_GROUP_SIZE*NUM_THREADS) ;
-   uint32_t log2_num_warp_groups = num_warp_groups >> 1 ? num_warp_groups >> 1 : 1;
+   uint32_t sqrt_num_warp_groups = num_warp_groups >> 1 ? num_warp_groups >> 1 : 1;
 
-   uint32_t tileSizeCol = MAT_N/log2_num_warp_groups ;
-   uint32_t tileSizeRow = MAT_M/log2_num_warp_groups ;
+   uint32_t tileSizeCol = MAT_N/sqrt_num_warp_groups ;
+   uint32_t tileSizeRow = MAT_M/sqrt_num_warp_groups ;
 
    if (num_warp_groups == 2) {
        tileSizeCol = MAT_N /2;
@@ -79,7 +79,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO ; // assuming col major
    //float* const C_start = (float*const)(kernel_arg->C_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol; // assuming row major
-   float* const D_start = (float*const)(kernel_arg->D_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol;
+   float* const D_start = (float*const)(kernel_arg->D_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol; //assuming row major
 
 
 
@@ -133,13 +133,14 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
            vx_barrier(warp_group,WARP_GROUP_SIZE);
 
-           if (warp_id % warp_group == 0) {
+           if (warp_id % WARP_GROUP_SIZE == 0) {
                 float _tmpA[A_ROWS*K_MULTIPLE] = {0};
                 float _tmpB[B_COLS*K_MULTIPLE] = {0};
                 tc_mma_acc_buf_wb_reg<A_ROWS, B_COLS,  TC_THREAD_N> (_tmpA, _tmpB, regC) ;
                 tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
            }
 
+           vx_barrier(warp_group,WARP_GROUP_SIZE);
 
 
            //C_ptr=C_ptr + tc_n ; // ROW MAJOR

@@ -10,10 +10,9 @@
 // func2
 enum class OperationMode : int{
     ACC_REG_WB_REG = 0,
-    ACC_REG_WB_BUF = 1,
+    ACC_REG_WB_BUF = 1, // unused
     ACC_BUF_WB_REG = 2,
     ACC_BUF_WB_BUF = 3,
-
 };
 
 
