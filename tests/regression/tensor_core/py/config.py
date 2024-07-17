@@ -15,6 +15,7 @@ parser.add_argument('--a_orientation', type=str, default='row_major', choices=['
 parser.add_argument('--b_orientation', type=str, default='col_major', choices=['row_major, col_major'], help='B Matrix internal representation ')
 parser.add_argument('--c_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='C Matrix internal representation ')
 parser.add_argument('--d_orientation', type=str, default='row_major', choices=['row_major, col_major'], help='D Matrix internal representation ')
+parser.add_argument('--generate_gemm', help="generate a new gemm", action='store_false') 
 
 # Vortex configurtion
 parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of threads in system')
@@ -35,14 +36,15 @@ parser.add_argument('--K_MULTIPLE', type=int, default=1, help='Hide latency usin
 parser.add_argument('--warp_group_size', type=int, default=0, help='Warp group size')
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
+
 args = parser.parse_args()
 
-if args.config:
-    with open(args.config, 'r') as f:
-        args = json.load(f)
-else:
-    args = vars(args)
+args = vars(args)
 
+if args["config"]:
+    with open(args["config"], 'r') as f:
+        config_args = json.load(f)
+        args.update(config_args)
 
 
 def get_precision_ratio(op_type) :
@@ -80,7 +82,7 @@ def generate_matrices(M, N, K, A_type='fp16', B_type='fp16', C_type='fp32', D_ty
     else:
         C = np.random.rand(M, N).astype(np.float32)
 
-    D = np.dot(A, B) + C
+    D = np.dot(A, B)# + C
 
     if D_type == 'fp16':
         D = D.astype(np.float16)
@@ -112,16 +114,17 @@ print(args)
 
 # Print Matrices
 
-A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
-print("----PRINTING A----")
-print(A)
-print("----PRINTING B----")
-print(B)
-print("----PRINTING C----")
-print(C)
-print("----PRINTING D----")
-print(D)
-save_matrices_to_file(A, B, C, D)
+if args["generate_gemm"]: 
+    A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
+    print("----PRINTING A----")
+    print(A)
+    print("----PRINTING B----")
+    print(B)
+    print("----PRINTING C----")
+    print(C)
+    print("----PRINTING D----")
+    print(D)
+    save_matrices_to_file(A, B, C, D)
 
 class TCConfig:
     thread_group_size = 0 #
@@ -169,7 +172,7 @@ tc.warp_group_size = args["warp_group_size"]
 # Check for valid configuration here
 # Thread group size is also equal to participating threads in an output row
 assert tc.num_threads/tc.thread_group_size >= tc.thread_group_size, "Invalid configuration. Each thread must be able to calculate at least 1 output value per load"
-assert tc.warp_group_size != 1 , "Invalid warp group size. Warp group size cannot be 1"
+# assert tc.warp_group_size != 1 , "Invalid warp group size. Warp group size cannot be 1"
 
 # 2. System parameters
 class GEMMArgs:
@@ -182,6 +185,8 @@ class GEMMArgs:
         # Outer product params
         self.a_rows = 0
         self.b_cols = 0
+        #
+        self.lsu_lanes =1 
     def Dm(self):
         return f"-Dtc_m={self.m}"
     def Dn(self):
@@ -194,8 +199,10 @@ class GEMMArgs:
         return f"-DB_COLS={self.b_cols}"
     def Dk_multiple(self):
         return f"-DK_MULTIPLE={self.k_multiple}"
+    def Dnum_lanes(self):
+        return f"-DNUM_LSU_LANES={self.lsu_lanes}"
     def getdef(self):
-        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple()}"
+        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple()} {self.Dnum_lanes()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -207,6 +214,7 @@ system.b_cols = args["B_COLS"]
 system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
 system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple  # * precision of fp16 (res_size/op_size)
+system.lsu_lanes = min(int(math.ceil(tc.num_threads * (1/system.a_rows + 1/system.b_cols))), tc.num_threads) 
 print("TC")
 print (tc)
 print("GEMM")

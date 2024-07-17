@@ -78,28 +78,28 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO ; // assuming col major
-   float* const C_start = (float*const)(kernel_arg->C_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol; // assuming row major
+   //float* const C_start = (float*const)(kernel_arg->C_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol; // assuming row major
    float* const D_start = (float*const)(kernel_arg->D_addr) + blockRow*tileSizeRow*MAT_N + blockCol *tileSizeCol;
 
 
 
    const layout_t a_layout = (layout_t)(kernel_arg->A_layout);
    const layout_t b_layout = (layout_t)(kernel_arg->B_layout);
-   const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
+   //const layout_t c_layout = (layout_t)(kernel_arg->C_layout);
    const layout_t d_layout = (layout_t)(kernel_arg->D_layout);
 
    float* A_ptr = A_start;
    float* B_ptr = B_start;
-   float* C_ptr = C_start;
+   //float* C_ptr = C_start;
    float* D_ptr = D_start;
 
    float regA[A_ROWS*K_MULTIPLE]; // THREAD_K*PREC_RATIO is always 1 i want to issue at once
    float regB[B_COLS*K_MULTIPLE];
-   float regC[A_ROWS*B_COLS* TC_THREAD_N] = {0}; // Number of mac units per lane
+
 
    // Main GEMM (simple 1 warp impl)
    for (int i = 0; i < tileSizeRow; i+=tc_m) {
-       C_ptr=C_start + MAT_N*i; // ROW MAJOR
+       //C_ptr=C_start + MAT_N*i; // ROW MAJOR
        D_ptr=D_start + MAT_N*i; // ROW MAJOR
        for (int j = 0; j < tileSizeCol; j+=tc_n){
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
@@ -115,6 +115,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
            //}
            //vx_barrier(warp_group, WARP_GROUP_SIZE);
 
+   	  float regC[A_ROWS*B_COLS* TC_THREAD_N] = {0}; // Number of mac units per lane
 
 
            for (int k = 0; k < (MAT_K); k+=tc_k*WARP_GROUP_SIZE) {
@@ -141,7 +142,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
 
 
-           C_ptr=C_ptr + tc_n ; // ROW MAJOR
+           //C_ptr=C_ptr + tc_n ; // ROW MAJOR
            D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }
    }

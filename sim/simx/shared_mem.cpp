@@ -71,7 +71,7 @@ public:
     }
 
     void tick() {
-        std::vector<bool> in_used_banks(config_.num_banks);
+        std::vector<bool> in_used_banks(config_.num_banks,false);
         for (uint32_t req_id = 0; req_id < config_.num_reqs; ++req_id) {
             auto& core_req_port = simobject_->Inputs.at(req_id);
             if (core_req_port.empty())
@@ -81,7 +81,9 @@ public:
 
             uint32_t bank_id = 0;
             if (bank_sel_addr_start_ <= bank_sel_addr_end_) {
-                bank_id = (uint32_t)bit_getw(core_req.addr, bank_sel_addr_start_, bank_sel_addr_end_);
+                //bank_id = (uint32_t)bit_getw(core_req.addr, bank_sel_addr_start_, bank_sel_addr_end_);
+                bank_id = (uint32_t)((core_req.addr >> log2ceil(sizeof(Word))) & ((1 << log2ceil(config_.num_banks))-1) );
+                //std::cout << std::dec << "Addr: " << (core_req.addr) << "Bank_id: "  << bank_id << std::endl;
             }
 
             // bank conflict check

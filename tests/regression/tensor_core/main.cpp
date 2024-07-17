@@ -32,13 +32,13 @@ int main(){
 
     A = (float *)malloc(A_bytes);
     B = (float *)malloc(B_bytes);
-    C = (float *)malloc(C_bytes);
+    //C = (float *)malloc(C_bytes);
     D_result = (float *)malloc(C_bytes); // allocate on dev
 
 
     D_expected = (float *)malloc(MM_M * MM_N * TC_RES_SIZE); // allocate on host
 
-    read_matrices<TC_OP_SIZE, TC_RES_SIZE>(filename, MM_M, MM_N, MM_K, &A, &B, &C, &D_expected);
+    read_matrices<TC_OP_SIZE, TC_RES_SIZE>(filename, MM_M, MM_N, MM_K, &A, &B, &D_expected);
     // Print operand matrices
     std::cout << "MAINCPP: PRINTING ROW MAJOR A (" << MM_M << "x" << MM_K << ")" << std::endl;
     for (int i = 0 ; i < MM_M; i++) {
@@ -70,20 +70,17 @@ int main(){
         std::cout << std::endl;
     }
 
-    std::cout << "MAINCPP: PRINTING C" << std::endl;
-    for (int i = 0 ; i < MM_M; i++) {
-        for (int j = 0 ; j < MM_N; j++) {
-            printf("%f ", C[((i*MM_N) + j)]);
-        }
-        std::cout << std::endl;
-    }
+    //std::cout << "MAINCPP: PRINTING C" << std::endl;
+    //for (int i = 0 ; i < MM_M; i++) {
+    //    for (int j = 0 ; j < MM_N; j++) {
+    //        printf("%f ", C[((i*MM_N) + j)]);
+    //    }
+    //    std::cout << std::endl;
+    //}
 
-    //open device connection
-    // open device connection
     std::cout << "open device connection" << std::endl;
     vx_dev_open(&device);
     // Read hardware registers
-    // Big matrix multiplication tiling strategy (mapping problem here)
 
     // allocate device memory
     std::cout << "allocate device memory" << std::endl;
@@ -95,9 +92,9 @@ int main(){
     kernel_arg_t kernel_args;
 
 
-    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_GLOBAL, &A_ADDR);
-    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_GLOBAL, &B_ADDR);
-    vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_GLOBAL, &C_ADDR);
+    vx_mem_alloc(device, A_bytes, VX_MEM_TYPE_LOCAL, &A_ADDR);
+    vx_mem_alloc(device, B_bytes, VX_MEM_TYPE_LOCAL, &B_ADDR);
+    //vx_mem_alloc(device, C_bytes, VX_MEM_TYPE_LOCAL, &C_ADDR);
     vx_mem_alloc(device, D_bytes, VX_MEM_TYPE_GLOBAL, &D_ADDR);
     std::cout << std::hex << "A_ADDR: " << A_ADDR << "\n \
             B_ADDR: " << B_ADDR << "\n \
@@ -108,8 +105,8 @@ int main(){
     kernel_args.A_layout = 0;
     kernel_args.B_addr = B_ADDR;
     kernel_args.B_layout = 0;
-    kernel_args.C_addr = C_ADDR;
-    kernel_args.C_layout = 0;
+    //kernel_args.C_addr = C_ADDR;
+    //kernel_args.C_layout = 0;
     kernel_args.D_addr = D_ADDR;
     kernel_args.D_layout = 0;
 
@@ -130,7 +127,7 @@ int main(){
     // copy operand data to device
     vx_copy_to_dev(device, A_ADDR, A, A_bytes);
     vx_copy_to_dev(device, B_ADDR, B, B_bytes);
-    vx_copy_to_dev(device, C_ADDR, C, C_bytes);
+    //vx_copy_to_dev(device, C_ADDR, C, C_bytes);
     vx_copy_to_dev(device, KERNEL_ARG_DEV_MEM_ADDR, &kernel_args, sizeof(kernel_args));
 
     // upload program
@@ -173,7 +170,7 @@ int main(){
 
     free(A);
     free(B);
-    free(C);
+    //free(C);
     free(D_expected) ;
     free(D_result);
 }

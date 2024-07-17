@@ -710,6 +710,10 @@ bool Core::check_exit(Word* exitcode, bool riscv_test) const {
 }
 
 bool Core::running() const {
+  if (committed_instrs_ == issued_instrs_) {
+      std::cout << std::dec << "Ibuf stalls: " << perf_stats_.ibuf_stalls << std::endl;
+      std::cout << std::dec << "scrb stalls: " << perf_stats_.scrb_stalls<< std::endl;
+  }
   return (committed_instrs_ != issued_instrs_);
 }
 

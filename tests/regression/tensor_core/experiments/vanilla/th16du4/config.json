@@ -2,8 +2,6 @@
     "M": 512,
     "N": 512,
     "K": 512,
-
-
     "op_type": "fp16",
     "res_type": "fp32",
     "a_orientation": "row_major",
@@ -14,16 +12,12 @@
     "num_warps": 8,
     "num_clusters": 1,
     "num_cores": 1,
-
-    "num_dot_units": 1,
+    "num_dot_units": 4,
     "input_mat_buf_depth": 1,
     "output_fifo_size": 8,
-
-
-    "A_ROWS": 4,
-    "B_COLS": 2,
+    "A_ROWS": 15,
+    "B_COLS": 1,
     "K_MULTIPLE": 1,
-    "warp_group_size" : 8,
-
-    "define_file": "defines.txt"
+    "warp_group_size": 8,
+    "define_file": "/home/bakr/gpu/vortex/tests/regression/tensor_core/defines.txt"
 }
