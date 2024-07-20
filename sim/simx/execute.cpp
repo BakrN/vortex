@@ -1320,50 +1320,20 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     trace->exe_type = ExeType::TC;
     trace->wb = trace->rdest_type == RegType::Float ? true : false;
     int type = TCOpType::FP16 ;
-    bool normal_load = false;
     //std::cout << "executing TC trace: \n";
     //std::cout << "load type: ";
-    if (instr.getNRSrc() > 1) {  // Normal mode
+    if (instr.getFunc3() == 0) {
         type |= (int)TCOpType::NORMAL_LOAD;
-        normal_load = true;
-        //std::cout << "normal_load\n";
     } else {
         type |= TCOpType::C_ONLY;
-        //std::cout << "c_only\n";
     }
     //std::cout << " Type: ";
-    if (trace->wb) { //WB reg
-        if (normal_load) {
-            if(instr.getRSType(2) == RegType::TC) {
-                type |= TCOpType::ACC_BUF_WB_REG;
-                //std::cout << " ACC_BUF_WB_REG\n";
-            }
-            else {
-                type |= TCOpType::ACC_REG_WB_REG;
-                //std::cout << " ACC_REG_WB_REG\n";
-            }
-        } else {
-            if(instr.getRSType(0) == RegType::Float) {
-                type |= TCOpType::ACC_REG_WB_REG;
-                //std::cout << " ACC_REG_WB_REG\n";
-            } else {
-                type |= TCOpType::ACC_BUF_WB_REG;
-                //std::cout << " ACC_BUF_WB_REG\n";
-            }
-        }
-    } else { // wb buf
-        if (normal_load) {
-            if (instr.getRSType(2) == RegType::TC) {
-                type |= TCOpType::ACC_BUF_WB_BUF;
-                //std::cout << " ACC_BUF_WB_BUF\n";
-            } else {
-                type |= TCOpType::ACC_REG_WB_BUF;
-                //std::cout << " ACC_REG_WB_BUF\n";
-            }
-        } else {
-            type |= TCOpType::ACC_REG_WB_BUF; // cannot have c only load in buf mode
-            //std::cout << " ACC_REG_WB_BUF\n";
-        }
+    if (instr.getFunc2() == 0) {
+        type |= TCOpType::ACC_REG_WB_REG;
+    } else if (instr.getFunc2() == 3){
+        type |= TCOpType::ACC_BUF_WB_BUF ;
+    } else {
+        std::abort();
     }
 
     trace->rsrc1 = instr.getRSrc(0);
@@ -1378,7 +1348,15 @@ void Warp::execute(const Instr &instr, pipeline_trace_t *trace) {
     trace->tc_type = (vortex::TCOpType)type;
     this->core_->func_tensor_core_->execute(trace);
   }break;
-
+  case TC_FLUSH : {
+    trace->exe_type = ExeType::TC;
+    trace->tc_type = TCOpType::FLUSH_INST;
+    trace->rsrc1   = instr.getRSrc(0);
+    trace->imm     = instr.getImm();
+    trace->wb      = true;
+    //std::cout << "Executing flush to rd: " << std::dec << trace->rdest << std::endl;
+    this->core_->func_tensor_core_->execute(trace);
+  } break;
   case EXT1: {
     switch (func7) {
     case 0: {

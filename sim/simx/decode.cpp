@@ -52,7 +52,8 @@ static const std::unordered_map<Opcode, InstType> sc_instTable = {
   {Opcode::EXT2,       InstType::R4_TYPE},
   {Opcode::R_INST_W,   InstType::R_TYPE},
   {Opcode::I_INST_W,   InstType::I_TYPE},
-  {Opcode::HMMA,       InstType::R4_TYPE}
+  {Opcode::HMMA,       InstType::R4_TYPE},
+  {Opcode::TC_FLUSH,       InstType::I_TYPE}
 };
 
 enum Constants {
@@ -573,7 +574,7 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
 
   case InstType::I_TYPE: {
     instr->addSrcReg(rs1, RegType::Integer);
-    if (op == Opcode::FL) {
+    if (op == Opcode::FL || op == Opcode::TC_FLUSH) {
       instr->setDestReg(rd, RegType::Float);
     } else {
       instr->setDestReg(rd, RegType::Integer);
@@ -737,16 +738,15 @@ std::shared_ptr<Instr> Decoder::decode(uint32_t code) const {
             instr->addSrcReg(rs1, RegType::Float);
             instr->addSrcReg(rs2, RegType::Float);
         }
-        if (func2 <  2) { // acc reg mode
+        if (func2 ==  0) { // acc reg mode
             instr->addSrcReg(rs3, RegType::Float);
-        } else {         // acc in tc mode
-            instr->addSrcReg(rs3, RegType::TC) ;
-        }
-        if (func2 % 2 ==0) { // wb reg mode
             instr->setDestReg(rd, RegType::Float) ;
-        } else {  // wb to tc mode
-            instr->setDestReg(rd, RegType::TC) ;
+        } else {         // acc in tc mode
+            instr->addSrcReg((((rd & 0x1F) << 5) | (rs3 & 0x1F)), RegType::TC) ;
+            instr->setDestReg((((rd & 0x1F) << 5) | (rs3 & 0x1F)), RegType::TC) ;
+
         }
+
     } else {
       instr->setDestReg(rd, RegType::Float);
       instr->addSrcReg(rs1, RegType::Float);

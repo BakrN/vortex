@@ -74,6 +74,7 @@ class TensorCore {
         uint64_t m_cycle = 0;
         uint32_t m_step = 0  ;
         statistics::Statistic* mac_fire;
+        statistics::Statistic* flush_inst;
         // Ticks functions
         template <bool FUNC>
         bool handleInput(vortex::pipeline_trace_t* trace); // accepted
@@ -83,10 +84,10 @@ class TensorCore {
     private:
         struct WritebackInfo{
             bool reg_wb;
+            bool flush ;
             vortex::pipeline_trace_t* trace;
             int tile_reg;
             int tile_buf;
-            int idx;
         };
         // per warp per lane, vector reg
         std::vector<std::vector<std::vector<uint32_t>>> a;

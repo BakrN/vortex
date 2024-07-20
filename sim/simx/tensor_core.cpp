@@ -85,6 +85,7 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
     bool spaceToAccept = true;
     spaceToAccept &= c[wid][0].isEmpty() || (!c[wid][0].isFull() && ((trace->tc_type & 0x00F0) == vortex::TCOpType::C_ONLY))/*acc from reg*/;
     //spaceToAccept &= !(b[wid][0].isFull() && (trace->tc_type & 0x00F0) == vortex::TCOpType::NORMAL_LOAD);
+    spaceToAccept |= (trace->tc_type == vortex::TCOpType::FLUSH_INST && out_fifo_credits) ;//&& ((out_fifo_credits && !FUNC) || FUNC);
     if (!spaceToAccept) {
         return false;
     }
@@ -94,17 +95,16 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
             uint32_t val ;
             auto& reg_file = core->warps_[wid]->freg_file_;
 
-            if ((trace->tc_type & 0x000F) < 3)  { // acc reg  file
+            if ((trace->tc_type & 0x000F) == vortex::TCOpType::ACC_REG_WB_REG)  { // acc reg  file
                 val = reg_file[tid][trace->rsrc3] & 0xFFFFFFFF;
                 //std::cout << "tid(" << tid << ") reg("<< trace->rsrc3 << ") Adding c: " << uint32_to_float32(val) << std::endl;
                 c[wid][tid].enqueue({false, nullptr, val});
 
-            } else {// acc is buffer
+            } else {// ACC_BUF_WB_BUF
 
                 //std::cout << "tid(" << tid << ") Adding c from tiles: ";
                 // if
-                int loop_bound = ((trace->tc_type & 0x000F) == vortex::TCOpType::ACC_BUF_WB_BUF) ? m_config.thread_n : 1; // only add all cs if its a acc buf and wb buf
-                for (int i =0 ; i < loop_bound; i++) {
+                for (int i =0 ; i < (int)m_config.thread_n; i++) {
                     //
                     int reg = trace->rsrc3+i; // IN hw value encoded in imm
                     int buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
@@ -140,50 +140,46 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
 
                 b[wid][tid].enqueue(std::move(b_vals));
                 //std::cout << "Test printing b values: " ;
-                for (int i = 0 ; i < m_config.thread_group_size; i++) {
+                //for (int i = 0 ; i < m_config.thread_group_size; i++) {
                     //std::cout << b[wid][tid].front()[i]<<  " , " ;
 
-                }
+                //}
                 //std::cout << std::endl;
             }
         }
-    } else{  // C load only (never happening if it's an accumulate buf(except final flush?)) ... have sepeate flush operation
+    } else if (trace->tc_type != vortex::TCOpType::FLUSH_INST){  // C load only
         for (size_t tid =0 ; tid < m_config.num_threads;tid++) {
             if constexpr (FUNC){
 
-                if ((trace->tc_type & 0x000F) < 3) { // reg acc
+                if ((trace->tc_type & 0x000F) == vortex::ACC_REG_WB_REG) { // reg acc
                     uint32_t val = core->warps_[wid]->freg_file_[tid][trace->rsrc1] & 0xFFFFFFFF;
                     c[wid][tid].enqueue({false, nullptr, val});
-                } else {  // c_only in tc_mma_wg_after from buf (ACC_BUF_WB_REG)
-                    auto reg = trace->rsrc1;
-                    auto buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
-                    c[wid][tid].enqueue({true, &(tile_reg[tid][buf][reg]), 0});
+                } else {
+                    // Error here.
+                    std::abort();
                 }
 
                 //std::cout << "tid(" << tid << ") Adding c_only: " << val << std::endl;
             } else {
-                c[wid][tid].enqueue({}); // timing enqueue whatever
+                c[wid][tid].enqueue({}); // for timing enqueue whatever
             }
-
         }
     }
     WritebackInfo info;
     info.reg_wb = trace->wb;
-    if (!info.reg_wb){
+    info.flush = trace->tc_type == vortex::TCOpType::FLUSH_INST;
+    if (!info.reg_wb) {
         if constexpr (!FUNC) {
             core->committed_instrs_++;
         }
         // if acc buf
-        int loop_bound = (trace->tc_type & 0x000F) == vortex::TCOpType::ACC_BUF_WB_BUF ? m_config.thread_n : 1;
 
-        for (int i = 0 ; i < loop_bound; i++) {
+        for (int i = 0 ; i < (int)m_config.thread_n; i++) {
             info.trace= nullptr;
             info.tile_reg = trace->rdest +i;
             info.tile_buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
 
-            if (loop_bound >1) {
                 //std::cout << "Writing back to tile buf: " << info.tile_buf << " tile reg: " << info.tile_reg << std::endl;
-            }
             trace_q[wid].push(info);
         }
         if constexpr (!FUNC) {
@@ -191,6 +187,13 @@ bool TensorCore::handleInput(vortex::pipeline_trace_t* trace) {
         }
     } else {
         info.trace = trace;
+        if (info.flush){
+            //std::cout << "Accepted flush instruction\n";
+            info.tile_reg = (core->warps_[trace->wid]->ireg_file_[0][trace->rsrc1]) + trace->imm; // used as src addr All thread values should be the same
+            info.tile_buf = trace->wid / (NUM_WARPS /m_config.num_tile_bufs);
+            //std::cout << "Tile_reg: " << info.tile_reg << " tile buf: " << info.tile_buf  << std::endl ;
+        }
+
         trace_q[wid].push(info);
     }
 
@@ -206,40 +209,52 @@ bool TensorCore::compute() { // this step is only for functional  portion
             continue;
         }
         auto wb_info = trace_q[wid].front();
-        if (!c[wid][0].isEmpty() && (FUNC || ((wb_info.reg_wb && out_fifo_credits) || !wb_info.reg_wb))) {
+        if ((!c[wid][0].isEmpty() && (FUNC || ((wb_info.reg_wb && out_fifo_credits) || !wb_info.reg_wb))) || wb_info.flush) {
             fired = true;
+            if (wb_info.flush) {
+                //std::cout << "here" << std::endl;
+            }
             if constexpr (!FUNC){
                 out_fifo_credits -= trace_q[wid].front().reg_wb;
-                mac_fire->addValue(1) ;
+                mac_fire->addValue(!wb_info.flush) ;
+                flush_inst->addValue(wb_info.flush);
             }
             for (size_t tid = 0 ; tid < m_config.num_threads; tid++) {
                 if constexpr(FUNC) {
-                    auto& b_vals = b[wid][tid].front();
+                    if (wb_info.flush) {
+                        uint64_t res = nan_box(tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg]);
+                        std::cout <<  "Queueing res: "<< res <<" to: " << wb_info.trace->rdest <<" from wid: " << wid << " from tid: " << tid << " tile_reg: " << wb_info.tile_reg << std::endl;
+                        core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
+                        tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = 0 ;
+
+                        continue;
+                    }
                     auto [c_tile_src, c_val_ptr, c_reg_val] = c[wid][tid].front();
                     uint32_t c_val = c_tile_src ? *c_val_ptr : c_reg_val;
+                    auto& b_vals = b[wid][tid].front();
                     auto result = dot_product(Precision::FP16, Precision::FP32, a[wid][tid], b_vals, c_val);
                     if (wb_info.reg_wb) {
                         uint64_t res = nan_box(result);
                         core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
 
-                        if (c_tile_src) {// reset if src acc and wb reg
-                            *c_val_ptr =0 ;
-                        }
 
-                        //std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
-                        //<< " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
+                        std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
+                        << " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
                     } else {
                         tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = result;
                     }
                 }
-                b[wid][tid].dequeue();
-                c[wid][tid].dequeue();
+                if (!wb_info.flush) {
+                    b[wid][tid].dequeue();
+                    c[wid][tid].dequeue();
+                }
             }
 
             trace_q[wid].pop();
             if constexpr (!FUNC) {
                 if (wb_info.reg_wb){
-                    commit_fifo.push({m_cycle+m_config.execution_latency, wb_info.trace});
+                    auto delay = wb_info.flush ? 0 : m_config.execution_latency;
+                    commit_fifo.push({m_cycle+delay, wb_info.trace});
                     //std::cout << "Queue trace: " << *(wb_info.trace) << std::endl;
                 }
             }
@@ -294,6 +309,7 @@ void FuncTensorCore::execute(vortex::pipeline_trace_t* trace){
 
 TimingTensorCore::TimingTensorCore(const SimContext& ctx, vortex::Core*c, Config_t config) : TensorCore(c, config), vortex::ExeUnit(ctx, c, "TensorCore") {
     mac_fire = SimPlatform::instance().get_stat_engine().registerStatistic(c->name()+".tensor_core.mac_fire");
+    flush_inst = SimPlatform::instance().get_stat_engine().registerStatistic(c->name()+".tensor_core.flush_inst");
 }
 
 TimingTensorCore::~TimingTensorCore(){

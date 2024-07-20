@@ -80,12 +80,10 @@ inline std::ostream &operator<<(std::ostream &os, const RegType& type) {
 
 
 enum TCOpType : int{ // BAKR NOTE: more types later ( should be tied to the instruction extension
+    FLUSH_INST     = 0x0000,
     // Accumulation source and writeback
-    INVALID        = 0x0000,
     ACC_REG_WB_REG = 0x0001,
-    ACC_REG_WB_BUF = 0x0002,
-    ACC_BUF_WB_REG = 0x0003, // only for warp leader
-    ACC_BUF_WB_BUF = 0x0004, // only for warp leader
+    ACC_BUF_WB_BUF = 0x0002,
     // Step Loading
     NORMAL_LOAD    = 0x0010,
     C_ONLY         = 0x0020,

@@ -47,7 +47,8 @@ enum Opcode {
   // Vector Extension
   VSET      = 0x57,
   // Tensor core
-  HMMA       = 0x7b,
+  HMMA      = 0x7b,
+  TC_FLUSH  = 0x7c,
   // Custom Extensions
   EXT1      = 0x0b,
   EXT2      = 0x2b,
