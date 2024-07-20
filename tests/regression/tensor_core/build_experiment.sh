@@ -7,13 +7,13 @@ cd py
 python config.py --config config.json
 
 tc_defines=`cat defines.txt`
-#cd ..
-#
-#cd ../../../
-#cd runtime/simx
-#make clean
-#
-#CONFIGS="${tc_defines}" make
+cd ..
+
+cd ../../../
+cd runtime/simx
+make clean
+
+CONFIGS="${tc_defines}" make
 cd $cur
 
 make clean-all

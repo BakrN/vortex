@@ -15,15 +15,15 @@
     "num_clusters": 1,
     "num_cores": 1,
 
-    "num_dot_units": 2,
+    "num_dot_units": 4,
     "input_mat_buf_depth": 1,
     "output_fifo_size": 8,
 
 
-    "A_ROWS": 2,
-    "B_COLS": 1,
+    "A_ROWS": 8,
+    "B_COLS": 2,
     "K_MULTIPLE": 1,
-    "warp_group_size" : 2,
+    "warp_group_size" : 8,
 
     "define_file": "defines.txt"
 }
