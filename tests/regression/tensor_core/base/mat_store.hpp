@@ -129,11 +129,14 @@ inline void tc_flush_wg(float* dest, float* regC , const int warp_id,const int t
     constexpr int cols_per_warp = (num_elements / (a_rows*thread_n)) ? (num_elements / (a_rows*thread_n))  : 1;
     constexpr int elements_in_row = num_elements/(cols_per_warp*rows_per_warp);
 
-    const int row_offset = warp_id*rows_per_warp % a_rows;
-    const int col_offset = (warp_id*rows_per_warp)/a_rows ;// for 0 i wnat it 0
+    //const int row_offset = warp_id*rows_per_warp % a_rows;
+    const int row_offset = (warp_id*elements_in_row*rows_per_warp)/thread_n % a_rows;
     const int thread_n_group = warp_id % (thread_n/elements_in_row ? thread_n/elements_in_row : 1);
+    //const int col_offset = (warp_id*rows_per_warp)/a_rows ;// for 0 i wnat it 0
+    const int col_offset = ((warp_id*elements_in_row*rows_per_warp)/thread_n)/a_rows;// for 0 i wnat it 0
 
-    const int start_inner_col = thread_n_group *thread_n/elements_in_row;
+    const int start_inner_col = thread_n_group* elements_in_row;
+    //const int tc_reg = warp_id* num_elements;
 
     int tc_reg =  row_offset*thread_n + col_offset*a_rows*thread_n + start_inner_col;
 
@@ -149,6 +152,7 @@ inline void tc_flush_wg(float* dest, float* regC , const int warp_id,const int t
 
     float* c_row_ptr = ptr + c_row_offset + c_col_offset;
 
+    // I need another for func it
     unrolled_for_func<0, cols_per_warp>([&](){
     unrolled_store_row_row_major<0, 0,rows_per_warp, elements_in_row,  float, outer_stride>(c_row_ptr, regC, mat_n);
         regC += rows_per_warp*thread_n;
