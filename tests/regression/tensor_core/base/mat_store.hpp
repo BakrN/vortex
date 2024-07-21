@@ -101,9 +101,10 @@ struct UnrollTcFlush {
     }
 };
 
-// Unrolled cooperative store
+// Naive with warp around bus stalls in writes due to (division is across thread_n)
+
 template <int loop, int a_rows,int b_cols, int thread_n, int num_lanes, int thread_group_size, int TC_M, int TC_N>
-struct UnrollCoopStore{
+struct UnrollCoopStoreWrapAround{
     inline void operator()(float*& dest, float*& regD, int tc_reg, int thread_id, int mat_n) {
         //constexpr int cur_row = loop / (thread_n) % a_rows;
         //constexpr int cur_col = loop / (a_rows*thread_n);
@@ -120,6 +121,25 @@ struct UnrollCoopStore{
         *(dest + cur_row*(TC_M/a_rows)*mat_n+ cur_col*(TC_N/b_cols) /*big a row and big b selection*/+ cur_tn_cn +c_row_offset + c_col_offset) = regD[loop];
     }
 };
+
+// Assumes no wrap around. In this case I can do calculations using constexpr
+
+template <int loop, int a_rows,int b_cols, int thread_n, int num_lanes, int thread_group_size, int TC_M, int TC_N>
+struct UnrollCoopStoreNonWrapAround{
+    inline void operator()(float*& dest, float*& regD, int tc_reg, int thread_id, int mat_n) {
+        constexpr int cur_row = loop / (thread_n) % a_rows;
+        constexpr int cur_col = loop / (a_rows*thread_n);
+        constexpr int cur_tn_cn = loop % thread_n;
+
+
+        const int thread_group_id = thread_id  / thread_group_size; // number of pes
+        auto c_row_offset = (mat_n*thread_group_id);
+        auto c_col_offset = (thread_id % thread_group_size)*thread_n;
+
+        *(dest + cur_row*(TC_M/a_rows)*mat_n+ cur_col*(TC_N/b_cols) + cur_tn_cn +c_row_offset + c_col_offset) = regD[loop];
+    }
+};
+
 
 /*
  * This function divides the tensor core flush operation among all the warps within a core. Returns a new address with correct offset. Assumes dest is row major
@@ -151,21 +171,23 @@ inline void tc_flush_wg(float* dest, float* regC , const int warp_id,const int t
 
     int tc_reg     = warp_idx* num_elements;
 
-    const int row_offset = tc_reg / (thread_n) % a_rows;
-    const int col_offset = tc_reg / (a_rows*thread_n);
-    const int inner_offset = tc_reg % thread_n;
+
 
     unrolled_flush_it<0, num_elements, UnrollTcFlush, a_rows, thread_n>(regC, tc_reg);
 
+    if constexpr (((a_rows*thread_n) % num_elements) != 0) {
 
-    unrolled_coop_store_it<0, num_elements, UnrollCoopStore, a_rows, b_cols, thread_n,NUM_LANES,THREAD_GROUP_SIZE,TC_M, TC_N>(dest, regC,tc_reg, thread_id,  mat_n);
-    //unrolled_for_func_it<0, num_elements,  a_rows, thread_n,UnrollTcFlush, float*&, int&>(regC, tc_reg);
-    // I need another for func it
-    //unrolled_for_func<0, cols_per_warp>([&](){
-    //unrolled_store_row_row_major<0, 0,rows_per_warp, elements_in_row,  float, outer_stride>(c_row_ptr, regC, mat_n);
-    //    regC += rows_per_warp*thread_n;
-    //    c_row_ptr += outer_stride;
-    // });
+
+        unrolled_coop_store_it<0, num_elements, UnrollCoopStoreWrapAround, a_rows, b_cols, thread_n,NUM_LANES,THREAD_GROUP_SIZE,TC_M, TC_N>(dest, regC,tc_reg, thread_id,  mat_n);
+
+    else {
+
+        const int row_offset = tc_reg / (thread_n) % a_rows;
+        const int col_offset = tc_reg / (a_rows*thread_n);
+        const int inner_offset = tc_reg % thread_n;
+        auto* ptr = dest + row_offset*(TC_M/a_rows)*mat_n+ col_offset*(TC_N/b_cols) +inner_offset;
+        unrolled_coop_store_it<0, num_elements, UnrollCoopStoreNonWrapAround, a_rows, b_cols, thread_n,NUM_LANES,THREAD_GROUP_SIZE,TC_M, TC_N>(ptr, regC,tc_reg, thread_id,  mat_n);
+    }
 
 
 
