@@ -180,7 +180,7 @@ inline void tc_flush_wg(float* dest, float* regC , const int warp_id,const int t
 
         unrolled_coop_store_it<0, num_elements, UnrollCoopStoreWrapAround, a_rows, b_cols, thread_n,NUM_LANES,THREAD_GROUP_SIZE,TC_M, TC_N>(dest, regC,tc_reg, thread_id,  mat_n);
 
-    else {
+    }else {
 
         const int row_offset = tc_reg / (thread_n) % a_rows;
         const int col_offset = tc_reg / (a_rows*thread_n);
