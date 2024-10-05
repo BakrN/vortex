@@ -4,7 +4,7 @@
 
 cur=$(pwd)
 cd py
-python config.py --config config.json
+python config.py --config config.json --generate_gemm
 
 tc_defines=`cat defines.txt`
 cd ..

@@ -22,8 +22,6 @@ enum class MatT {
     D
 };
 
-template <MatT>
-struct tc_tile ;
 
 
 template<MatT T >

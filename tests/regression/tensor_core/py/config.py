@@ -22,6 +22,7 @@ parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of t
 parser.add_argument('--num_warps', '-w', type=int, default=1, help='Number of warps')
 parser.add_argument('--num_cores', '-c', type=int, default=1, help='Number of cores')
 parser.add_argument('--num_clusters',  type=int, default=1, help='number of clusters')
+parser.add_argument('--issue_width',  type=int, default=4, help='Issue width')
 
 # Tensor Core Configuration
 parser.add_argument('--input_mat_buf_depth', type=int, default=1, help='input elastic buffer depth')
@@ -187,6 +188,7 @@ class GEMMArgs:
         self.b_cols = 0
         #
         self.lsu_lanes =1
+        self.issue_width=1
     def Dm(self):
         return f"-Dtc_m={self.m}"
     def Dn(self):
@@ -201,8 +203,10 @@ class GEMMArgs:
         return f"-DK_MULTIPLE={self.k_multiple}"
     def Dnum_lanes(self):
         return f"-DNUM_LSU_LANES={self.lsu_lanes}"
+    def Dissue_width(self):
+        return f"-DISSUE_WIDTH={self.issue_width}"
     def getdef(self):
-        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple()} {self.Dnum_lanes()}"
+        return f"{self.Dm()} {self.Dn()} {self.Dk()} {self.Darows()} {self.Dbcols()} {self.Dk_multiple()} {self.Dnum_lanes()} {self.Dissue_width()}"
     def __str__(self):
         attributes = [(attr, getattr(self, attr)) for attr in dir(self) if not attr.startswith("__") and not callable(getattr(self, attr))]
         return "\n".join([f"{attr_name}: {attr_value}" for attr_name, attr_value in attributes])
@@ -215,6 +219,8 @@ system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
 system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple  # * precision of fp16 (res_size/op_size)
 system.lsu_lanes = min(2**math.ceil(math.log2(tc.num_threads * (1/(system.a_rows) + 1/(system.b_cols*tc.thread_n)))), tc.num_threads)
+system.issue_width = min(4,int(min(args["issue_width"], args["num_warps"])))
+
 print("TC")
 print (tc)
 print("GEMM")

@@ -175,7 +175,7 @@ inline void tc_flush_wg(float* dest, float* regC , const int warp_id,const int t
 
     unrolled_flush_it<0, num_elements, UnrollTcFlush, a_rows, thread_n>(regC, tc_reg);
 
-    if constexpr (((a_rows*thread_n) % num_elements) != 0) {
+    if constexpr (((a_rows*thread_n) % num_elements) != 0 || (num_elements % 2 != 0 && num_elements > 1)) {
 
 
         unrolled_coop_store_it<0, num_elements, UnrollCoopStoreWrapAround, a_rows, b_cols, thread_n,NUM_LANES,THREAD_GROUP_SIZE,TC_M, TC_N>(dest, regC,tc_reg, thread_id,  mat_n);
