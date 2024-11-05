@@ -223,7 +223,7 @@ bool TensorCore::compute() { // this step is only for functional  portion
                 if constexpr(FUNC) {
                     if (wb_info.flush) {
                         uint64_t res = nan_box(tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg]);
-                        std::cout <<  "Queueing res: "<< res <<" to: " << wb_info.trace->rdest <<" from wid: " << wid << " from tid: " << tid << " tile_reg: " << wb_info.tile_reg << std::endl;
+                        //std::cout <<  "Queueing res: "<< res <<" to: " << wb_info.trace->rdest <<" from wid: " << wid << " from tid: " << tid << " tile_reg: " << wb_info.tile_reg << std::endl;
                         core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
                         tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = 0 ;
 
@@ -238,8 +238,8 @@ bool TensorCore::compute() { // this step is only for functional  portion
                         core->warps_[wid]->freg_file_[tid][wb_info.trace->rdest] = res;
 
 
-                        std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
-                        << " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
+                        //std::cout << "Wrote back res: " << uint32_to_float32(result) << " wid: " << wid
+                        //<< " tid: " << tid << " reg: " << wb_info.trace->rdest << std::endl;
                     } else {
                         tile_reg[tid][wb_info.tile_buf][wb_info.tile_reg] = result;
                     }

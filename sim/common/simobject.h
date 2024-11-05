@@ -391,7 +391,7 @@ public:
 private:
 
   SimPlatform() : cycles_(0) {
-      schedule_recurring([&](){sim_engine_.outputStatistics(cycles_);}, 10000);
+      schedule_recurring([&](){sim_engine_.outputStatistics(cycles_);}, 1000);
   }
 
   virtual ~SimPlatform() {
