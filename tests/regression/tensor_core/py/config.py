@@ -115,7 +115,7 @@ print(args)
 
 # Print Matrices
 
-if args["generate_gemm"]:
+if 1: #args["generate_gemm"]:
     A, B, C, D = generate_matrices(args["M"], args["N"], args["K"], args["op_type"], args["op_type"], args["res_type"], args["res_type"])
     print("----PRINTING A----")
     print(A)
@@ -218,7 +218,7 @@ system.b_cols = args["B_COLS"]
 system.m = int(tc.num_threads / tc.thread_group_size) * system.a_rows
 system.n = int(tc.num_threads / tc.thread_group_size) * system.b_cols
 system.k = int (tc.thread_group_size * get_precision_ratio(args["op_type"])) * system.k_multiple  # * precision of fp16 (res_size/op_size)
-system.lsu_lanes = min(2**math.ceil(math.log2(tc.num_threads * (1/(system.a_rows) + 1/(system.b_cols*tc.thread_n)))), tc.num_threads)
+system.lsu_lanes = min(2**math.ceil(math.log2(tc.num_threads/tc.thread_n * (1/system.a_rows + 1/system.b_cols))), tc.num_threads)
 system.issue_width = min(4,int(min(args["issue_width"], args["num_warps"])))
 
 print("TC")
