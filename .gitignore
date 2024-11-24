@@ -97,8 +97,5 @@ compile_commands.json
 *.cache
 *.s
 *ramulator*.log
-*stat*.txt
 *tensor_core/tensor_core*
-*tensor_core/*.csv
-*tensor_core/*.txt
-
+*stat*.txt
