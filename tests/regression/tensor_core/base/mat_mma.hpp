@@ -63,9 +63,6 @@ inline void mma (float* A, float* B, float* C=nullptr, float*  D = nullptr){
 
 
 
-// Execution inside tensor is as follow. Every thread in thread group has same A buffer. And therefore, every thread group is responsible for every element of its own row in the output tile
-// include a unrolled function for outer product as well
-
 
 template <int a_rows, int b_cols, int k_multiple, int thread_n,  bool in_place=true, int cur_row =0 , int cur_col=0>
 inline void tc_mma (float* regA, float* regB , float* regC ,  float* regD= nullptr) {

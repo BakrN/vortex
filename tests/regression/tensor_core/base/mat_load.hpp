@@ -2,7 +2,6 @@
 #define MAT_LOAD_HPP
 
 #include "mat_helper.hpp"
-// Assumes maximum sharing...
 
 template<int COL, int KK, int NUM_COLS, int K,  typename T, int NEXT_COL_OFFSET=1>
 inline constexpr void unrolled_load_col_row_major(T* row_ptr, T* registers,  int ROW_STRIDE) {
@@ -55,17 +54,11 @@ inline constexpr void unrolled_load_row_col_major(T* col_ptr, T* registers,  int
 
 
 
-/**
- *  Format: r = row , k = col
- *  A_r0k0 , A_r1k0, ... ,Ar0k1, Ar1k1, ...
- * */
-
-// Cooperative thread thread sharing (32x)
 template <typename T, int OP_size, int Res_size,
-    int THREAD_GROUP_SIZE,    // let's assume I know my thread_id beforehand
-    int NUM_LANES,  // total number of threads
+    int THREAD_GROUP_SIZE,
+    int NUM_LANES,
     int NUM_K = 1,
-    int NUM_ROWS = 1,  // Mac units  (determined by number of mac units i have inside the tensor core per lane or just number of outer product I want to do... )
+    int NUM_ROWS = 1,
     layout_t layout = layout_t::ROW_MAJOR
 >
 inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  const int MAT_K){
@@ -84,7 +77,7 @@ inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  
             a_row_ptr += THREAD_GROUP_SIZE;
         });
     } else{
-        //static_assert(false, "Need to implement something else.. (Would require unpacking) ");
+        //static_assert(false, "Requires packing unpacking operations which could only work when done from host so commented out for now");
         ////
         //auto row_offset = MAT_N*thread_group_id*OP_SIZE/Res_size + MAT_M*(thread_id% THREAD_GROUP_SIZE);
         //T* a_row_ptr = ptr + row_offset;
@@ -92,16 +85,12 @@ inline void load_tile_a(T* ptr, T* reg , const int thread_id, const int MAT_M,  
         //unrolled_load_row_col_major<0, 0, NUM_ROWS, THREAD_K/(Res_size/OP_size), T, outer_row_stride>(a_row_ptr, reg, row_stride); // this actually loads pe group
     }
 }
-/**
- *  Format: c = col , k = row
- *  B_c0k0 , B_c1k0, ... ,Bc0k1, Bc1k1, ...
- * */
 
-// Sharing happens on the B matrix
-template <typename T, int OP_size, int Res_size,   //(based on dot product width)
-    int THREAD_GROUP_SIZE,    // let's assume I know my thread_id beforehand
-    int NUM_LANES,  // total number of threads
-    int NUM_K = 1,  // so this can go in either  (outer prodcut can go in either way)
+
+template <typename T, int OP_size, int Res_size,
+    int THREAD_GROUP_SIZE,
+    int NUM_LANES,
+    int NUM_K = 1,
     int NUM_COLS = 1,
     layout_t layout = layout_t::COL_MAJOR
 >
@@ -111,7 +100,7 @@ inline void load_tile_b(T* ptr, T* reg , const int thread_id,  const int MAT_N, 
 
     if constexpr (layout == layout_t::ROW_MAJOR)  {
 
-        //static_assert(false, "Need to implement something else.. (Not supported. Would require unpacking)");
+        //static_assert(false, "Requires packing unpacking operations which could only work when done from host so commented out for now");
         //auto col_offset = (thread_group_id + MAT_N*(thread_id % THREAD_GROUP_SIZE)*THREAD_K )*OP_size/Res_size ;
         //T* b_col_ptr = ptr + col_offset;
         //const int col_stride = MAT_N * OP_size/Res_size;

@@ -1,7 +1,7 @@
 {
     "M": 512,
     "N": 512,
-    "K": 64,
+    "K": 512,
 
 
     "op_type": "fp16",
@@ -17,13 +17,13 @@
 
     "num_dot_units":4,
     "input_mat_buf_depth": 1,
-    "output_fifo_size": 8,
+    "output_fifo_size": 4,
 
 
-    "A_ROWS": 16, 
+    "A_ROWS": 16,
     "B_COLS": 4,
     "K_MULTIPLE": 1,
-    "warp_group_size" : 8,
+    "warp_group_size" : 2,
 
     "define_file": "defines.txt"
 }

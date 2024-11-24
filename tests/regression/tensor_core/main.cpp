@@ -40,35 +40,35 @@ int main(){
 
     read_matrices<TC_OP_SIZE, TC_RES_SIZE>(filename, MM_M, MM_N, MM_K, &A, &B, &D_expected);
     // Print operand matrices
-    //std::cout << "MAINCPP: PRINTING ROW MAJOR A (" << MM_M << "x" << MM_K << ")" << std::endl;
-    //for (int i = 0 ; i < MM_M; i++) {
-    //    for (int k = 0 ; k < MM_K/2; k+=1 ) { // fp16
-    //        constexpr int stride = (MM_K*TC_OP_SIZE)/4;
-    //        uint32_t* val = (uint32_t*)(&(A[i *stride  +k]));
-    //        uint16_t _second = (uint16_t)(*val >> 16);
-    //        uint16_t _first = (uint16_t)(*val & 0xFFFF);
-    //        float16 first(_first) ;
-    //        float16 second(_second);
-    //        std::cout << first.to_float32() << " ";
-    //        std::cout << second.to_float32() << " ";
-    //    }
-    //    std::cout << std::endl;
-    //}
+    std::cout << "MAINCPP: PRINTING ROW MAJOR A (" << MM_M << "x" << MM_K << ")" << std::endl;
+    for (int i = 0 ; i < MM_M; i++) {
+        for (int k = 0 ; k < MM_K/2; k+=1 ) { // fp16
+            constexpr int stride = (MM_K*TC_OP_SIZE)/4;
+            uint32_t* val = (uint32_t*)(&(A[i *stride  +k]));
+            uint16_t _second = (uint16_t)(*val >> 16);
+            uint16_t _first = (uint16_t)(*val & 0xFFFF);
+            float16 first(_first) ;
+            float16 second(_second);
+            std::cout << first.to_float32() << " ";
+            std::cout << second.to_float32() << " ";
+        }
+        std::cout << std::endl;
+    }
 
-    //std::cout << "MAINCPP: PRINTING COL MAJOR B (" << MM_K << "x" << MM_N << ")" << std::endl;
-    //for (int i = 0 ; i < MM_K; i++) {
-    //    for (int k = 0 ; k < MM_N/2; k+=1 ) {
-    //        constexpr int stride = (MM_K*TC_OP_SIZE)/4;
-    //        uint32_t* val = (uint32_t*)(&(B[i * stride +k]));
-    //        uint16_t _second = (uint16_t)(*val >> 16);
-    //        uint16_t _first = (uint16_t)(*val & 0xFFFF);
-    //        float16 first(_first) ;
-    //        float16 second(_second);
-    //        std::cout << first.to_float32() << " " ;
-    //        std::cout << second.to_float32()<< " ";
-    //    }
-    //    std::cout << std::endl;
-    //}
+    std::cout << "MAINCPP: PRINTING COL MAJOR B (" << MM_K << "x" << MM_N << ")" << std::endl;
+    for (int i = 0 ; i < MM_K; i++) {
+        for (int k = 0 ; k < MM_N/2; k+=1 ) {
+            constexpr int stride = (MM_K*TC_OP_SIZE)/4;
+            uint32_t* val = (uint32_t*)(&(B[i * stride +k]));
+            uint16_t _second = (uint16_t)(*val >> 16);
+            uint16_t _first = (uint16_t)(*val & 0xFFFF);
+            float16 first(_first) ;
+            float16 second(_second);
+            std::cout << first.to_float32() << " " ;
+            std::cout << second.to_float32()<< " ";
+        }
+        std::cout << std::endl;
+    }
 
     //std::cout << "MAINCPP: PRINTING C" << std::endl;
     //for (int i = 0 ; i < MM_M; i++) {
@@ -125,8 +125,8 @@ int main(){
     std::cout << "NUM CORES: " << num_cores << " NUM WARPS: " << num_warps << " NUM THREADS: " << num_threads <<  "NUM TASKS: " << kernel_args.num_tasks << std::endl;
 
     // copy operand data to device
-    //vx_copy_to_dev(device, A_ADDR, A, A_bytes);
-    //vx_copy_to_dev(device, B_ADDR, B, B_bytes);
+    vx_copy_to_dev(device, A_ADDR, A, A_bytes);
+    vx_copy_to_dev(device, B_ADDR, B, B_bytes);
     //vx_copy_to_dev(device, C_ADDR, C, C_bytes);
     vx_copy_to_dev(device, KERNEL_ARG_DEV_MEM_ADDR, &kernel_args, sizeof(kernel_args));
 
@@ -157,14 +157,14 @@ int main(){
     //}
 
     uint32_t errors=0;
-    //for (int i = 0 ; i < MM_M; i ++) {
-    //    for (int j = 0 ; j < MM_N; j++) {
-    //        if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j], 0.1f)) {
-    //            errors+=1;
-    //            std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
-    //        }
-    //    }
-    //}
+    for (int i = 0 ; i < MM_M; i ++) {
+        for (int j = 0 ; j < MM_N; j++) {
+            if (!float_eq(D_result[i* MM_N + j], D_expected[i* MM_N + j], 0.1f)) {
+                errors+=1;
+                std::cout << "Mismatch at (" << i << "," << j << ")" << " exp: " << D_expected[i* MM_N + j] << " act: " << D_result[i* MM_N + j] << std::endl;
+            }
+        }
+    }
     std::cout << "Total errors: " << errors << std::endl;
 
 

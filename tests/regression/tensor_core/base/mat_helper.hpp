@@ -33,13 +33,4 @@ inline void unrolled_coop_store_it(float*& dest, float*&reg, int tc_reg, int thr
 }
 
 
-//template<int i, int i_end, typename Func, typename... Args>
-//inline void unrolled_for_func(Func&& func, Args&&... args) {
-//    if constexpr (i < i_end) {
-//        func(std::forward<Args>(args)...);
-//        unrolled_for_func<i+1, i_end>(std::forward<Func>(func), std::forward<Args>(args)...);
-//    }
-//}
-
-
 #endif

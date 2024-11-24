@@ -18,9 +18,9 @@ plt.figure(figsize=(10, 6))
 for stat_name in df['stat_name'].unique():
     stat_data = df[df['stat_name'] == stat_name]
     if args.start > 0:
-        stat_data = stat_data[stat_data['timestamp'] >= args.start]#50000]
+        stat_data = stat_data[stat_data['timestamp'] >= args.start]
     if args.end > 0:
-        stat_data = stat_data[stat_data['timestamp'] <= args.end] # 120000]
+        stat_data = stat_data[stat_data['timestamp'] <= args.end] 
 
     total_sum = stat_data['sum'].sum()
     total_sum_mean = stat_data['sum'].mean()

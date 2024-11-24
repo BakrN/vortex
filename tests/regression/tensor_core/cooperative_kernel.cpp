@@ -7,9 +7,6 @@
 #include "base/mat_store.hpp"
 #include "common.h"
 
-/** NOTES
- *  Before and after barrier ids are unique to each workgroup
- * **/
 
 #define PREC_RATIO TC_OP_SIZE/TC_RES_SIZE
 #define ceil(numerator,denominator )  (numerator + denominator -1)/denominator
@@ -61,7 +58,6 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    if (num_warp_groups == 2) {
        tileSizeCol = MAT_N /2;
        tileSizeRow = MAT_M;
-       //tileSizeCol = tileSizeCol/2;
    }
 
    uint32_t num_blocksCols = MAT_N/tileSizeCol;
@@ -73,7 +69,6 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
        blockRow = 0 ;
    }
 
-   //vx_printf("task_id: %d, blockCol = %d, blockRow = %d, warp_group_idx: %d\n", task_id, blockCol, blockRow, warp_group);
 
    float* const A_start = (float*const)(kernel_arg->A_addr) + blockRow*tileSizeRow*MAT_N*PREC_RATIO ; // Assuming row major
    float* const B_start = (float*const)(kernel_arg->B_addr) + blockCol*tileSizeCol*MAT_K*PREC_RATIO ; // assuming col major
@@ -92,28 +87,16 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    //float* C_ptr = C_start;
    float* D_ptr = D_start;
 
-   float regA[A_ROWS*K_MULTIPLE]; // THREAD_K*PREC_RATIO is always 1 i want to issue at once
+   float regA[A_ROWS*K_MULTIPLE];
    float regB[B_COLS*K_MULTIPLE];
 
 
-   // Main GEMM (simple 1 warp impl)
    for (int i = 0; i < tileSizeRow; i+=tc_m) {
        //C_ptr=C_start + MAT_N*i; // ROW MAJOR
        D_ptr=D_start + MAT_N*i; // ROW MAJOR
        for (int j = 0; j < tileSizeCol; j+=tc_n){
            A_ptr=A_start + MAT_K*i*PREC_RATIO; // ROW MAJOR
            B_ptr=B_start + MAT_K*j*PREC_RATIO;  // COL MAJOR
-
-
-           //if (warp_id % WARP_GROUP_SIZE == 0) {
-           //     load_fragment<MatT::C>(C_ptr, (float*)regC, warp_id, thread_id, MAT_M, MAT_N);
-           //     float _tmpA[A_ROWS*K_MULTIPLE] = {0};
-           //     float _tmpB[B_COLS*K_MULTIPLE] = {0};
-           //    //tc_mma_acc_reg_wb_buf >(_tmpA, _tmpB, regC) ;
-           //     tc_mma_acc_reg_wb_buf<A_ROWS, B_COLS,  TC_THREAD_N>(_tmpA, _tmpB, regC);
-           //}
-           //vx_barrier(warp_group, WARP_GROUP_SIZE);
-
 
 
 
@@ -133,44 +116,10 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
             vx_barrier(warp_group,WARP_GROUP_SIZE);
             float regC[ceil(A_ROWS * TC_THREAD_N * B_COLS,WARP_GROUP_SIZE)] = {0};
             tc_flush_wg<A_ROWS, B_COLS, TC_THREAD_N, WARP_GROUP_SIZE,TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,tc_m,tc_n>(D_ptr, (float*)regC, warp_id, thread_id, MAT_N);
-   	        //float regD[2] = {0}; // Number of mac units per lane
-            //float* regC = (float*)regD;
-
-            //constexpr int rows_per_warp = 1;
-            //constexpr int cols_per_warp = 2;
-            //const int row_group = warp_id % (A_ROWS); /*/rows_per_group*/
-            //// rows_per_wapr
-            //const int col_group = warp_id / (A_ROWS); /**/
-
-            //const int start_row       = row_group ;
-            //const int start_col       = col_group ;
-            //const int start_inner_col = 0;
-
-
-            //int tc_reg = TC_THREAD_N*start_row + start_col*A_ROWS*TC_THREAD_N+ start_inner_col; // 2 * 2 = 4 , 2 + 1* 1* 2 = 4
-
-            //tc_flush<0> (regC,   tc_reg);
-            //tc_flush<1> (regC+1, tc_reg);
-            ////vx_barrier(warp_group,WARP_GROUP_SIZE);
-
-            //const int thread_group_id = thread_id  / TC_THREAD_GROUP_SIZE; // number of pes
-            //constexpr int outer_stride = TC_NUM_THREADS/TC_THREAD_GROUP_SIZE;
-
-            //auto* ptr =  D_ptr+ row_group*(tc_m/A_ROWS)*MAT_N+ col_group*(tc_n/B_COLS);
-            //// Division across a_rows
-
-            //auto c_row_offset = (MAT_N*thread_group_id);
-            //auto c_col_offset = (thread_id % TC_THREAD_GROUP_SIZE)*TC_THREAD_N;
-
-            //float* c_row_ptr = ptr + c_row_offset + c_col_offset;
-
-            //unrolled_store_row_row_major<0, 0,1, 2,  float, 0>(c_row_ptr, regD, MAT_N);
-           //tc_store<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N , TC_THREAD_GROUP_SIZE, TC_NUM_THREADS,A_ROWS,B_COLS>((float*)D_ptr, (float*)regC,  thread_id, MAT_M, MAT_N);
-
-
-
-           //C_ptr=C_ptr + tc_n ; // ROW MAJOR
-           D_ptr=D_ptr + tc_n ; // ROW MAJOR
+	    #ifdef EN_POST_BAR
+            vx_barrier(warp_group,WARP_GROUP_SIZE);
+	    #endif
+            D_ptr=D_ptr + tc_n ; // ROW MAJOR
        }
    }
 }

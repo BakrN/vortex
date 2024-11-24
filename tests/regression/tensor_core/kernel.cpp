@@ -33,8 +33,8 @@ inline void load_fragment(float* ptr , float*reg , int tid, int dim0,int dim1){
             load_tile_c<float, TC_OP_SIZE, TC_RES_SIZE,TC_THREAD_N,TC_THREAD_GROUP_SIZE, NUM_THREADS,A_ROWS, B_COLS>(ptr, reg, tid, dim0, dim1) ;
         }
     }
-}
 
+}
 
 void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
 
@@ -45,11 +45,8 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    const int MAT_M = kernel_arg->M_;
    const int MAT_N = kernel_arg->N_;
    const int MAT_K = kernel_arg->K_;
-   // Mat partitioning here
 
-   // Strategy here
-   // 2D Block output tile partitiong (possible to do k opt)
-   // Possible to assign X tasks per tile and reduce
+   //  Matrix partitioning
 
    uint32_t log2_num_tasks = (kernel_arg->num_tasks/NUM_THREADS >1 ? kernel_arg->num_tasks/NUM_THREADS >> 1 : 1);
 
@@ -59,7 +56,6 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    if (kernel_arg->num_tasks/NUM_THREADS ==2) {
        tileSizeCol = MAT_N /2;
        tileSizeRow = MAT_M;
-       //tileSizeCol = tileSizeCol/2;
    } else if (kernel_arg->num_tasks/NUM_THREADS ==8) {
        tileSizeCol = MAT_N /4;
        tileSizeRow = MAT_M /2 ;
@@ -92,7 +88,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
    //float* C_ptr = C_start;
    float* D_ptr = D_start;
 
-   float regA[A_ROWS*K_MULTIPLE]; // THREAD_K*PREC_RATIO is always 1 i want to issue at once
+   float regA[A_ROWS*K_MULTIPLE];
    float regB[B_COLS*K_MULTIPLE];
 
 
@@ -114,48 +110,7 @@ void kernel_body(int task_id, kernel_arg_t* __UNIFORM__ kernel_arg) {
                load_fragment<MatT::B>(B_ptr, (float*)regB, thread_id, MAT_N, MAT_K);
 
 
-
-               //#ifdef DEBUG
-
-                   //vx_printf("i = %d, j = %d, k = %d\n",i, j, k );
-                   //for (int col = 0 ; col< B_COLS; col+=1) {
-                   //for (int idx = 0 ; idx < tc_k*PREC_RATIO; idx +=1) {
-                   //    uint32_t* val = (uint32_t*)(&regA[idx]);
-                   //    uint16_t _first = (uint16_t)(*val >> 16);
-                   //    uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                   //    float16 first(_first) ;
-                   //    float16 second(_second);
-                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx, first.to_float32());
-                   //    vx_printf("(%d) regA[%d] = %f\n", thread_id, idx+1, second.to_float32());
-
-                   //    //uint32_t* val = (uint32_t*)(&regB[idx]);
-                   //    //uint16_t _first = (uint16_t)(*val >> 16);
-                   //    //uint16_t _second = (uint16_t)(*val & 0xFFFF);
-                   //    //float16 first = float16(_first);
-                   //    //float16 second = float16(_second);
-                   //    //vx_printf("(%d, %d) regB = %f\n", col, idx, first.to_float32());
-                   //    //vx_printf("(%d, %d) regB = %f\n", col, idx+1, second.to_float32());
-                   //}
-                   //}
-                   //for (int i = 0 ; i < A_ROWS; i++) {
-                   //    //print regC
-                   //    for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
-                   //        vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
-                   //    }
-                   //}
-
-                   //#endif
-
-               // normal
                tc_mma<A_ROWS, B_COLS, K_MULTIPLE, TC_THREAD_N>((float*)regA, (float*)regB, (float*)regC);
-               //#ifdef DEBUG
-               //for (int i = 0 ; i < A_ROWS; i++) {
-               //     for (int j = 0 ; j < TC_THREAD_N*B_COLS; j++) {
-               //         vx_printf(" (%d, %d) , regC[%d] = %f\n", i,j, regC[i*TC_THREAD_N*B_COLS + j]);
-               //     }
-               // }
-
-               //#endif
 
                A_ptr+=tc_k * PREC_RATIO; // assuming row major
                B_ptr+=tc_k * PREC_RATIO; // assumming col_major

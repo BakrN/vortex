@@ -1,5 +1,0 @@
-exp_name,threads,dot_units,num_warps,ibuf_stalls,scrb_stalls,ipc,instrs,cycles,cluster0-shared_mem0.reads_mean,cluster0-shared_mem0.reads_median,cluster0-shared_mem0.writes_mean,cluster0-shared_mem0.writes_median,cluster0-shared_mem0.bank_stalls_mean,cluster0-shared_mem0.bank_stalls_median,core.tensor_core.mac_fire_mean,core.tensor_core.mac_fire_median,core.tensor_core.flush_inst_mean,core.tensor_core.flush_inst_median
-32t4du,32,4,8,41,9426,31,18964382,609989,0.0,0.0,0.0,0.0,0.0,0.0,7.7348153248413904,7.0,0.0,0.0
-32t4du,32,4,2,39,2381,10,6405730,585416,0.0,0.0,0.0,0.0,0.0,0.0,2.73308052338492,3.0,0.0,0.0
-32t4du,32,4,4,75,4785,21,12809182,606586,0.0,0.0,0.0,0.0,0.0,0.0,5.275391945135924,6.0,0.0,0.0
-32t4du,32,4,1,15,1596,5,3204004,584842,0.0,0.0,0.0,0.0,0.0,0.0,1.36787210395828,2.0,0.0,0.0

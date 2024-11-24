@@ -19,5 +19,5 @@
     "B_COLS": 2,
     "K_MULTIPLE": 1,
     "warp_group_size": 8,
-    "define_file": "/home/bakr/gpu/vortex/tests/regression/tensor_core/defines.txt"
+    "define_file": "./tests/regression/tensor_core/defines.txt"
 }
