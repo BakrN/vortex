@@ -25,6 +25,8 @@ py/                     # Contains configuration and utility scripts
 The `build_experiment.sh` script in this directory is a bash script for running experiments. You can configure experiments by providing the `py/config.json` file as input to `py/config.py`. Alternatively, you can directly modify the `config.py` file or run experiments independently, but in such cases, ensure the necessary definitions are generated accordingly.
 
 
+As a first step, please follow instructions in the [Macro Definitions Section](#macro-definitions).
+
 To start running the experiments, please try executing the command: `./build_experiment.sh` at least once, to generate the binaries for the matrices: A, B and D.
 
 
@@ -56,10 +58,10 @@ Within each experiment subdirectory, you will find the following files:
 - **`out.log`**: Output log from the simulation, containing overall information such as the number of cycles.
 - **`statistic.txt`**: Trace of collected statistics during the run (e.g., tensor core activity such as `mac_fire`).
 
-### Macro definitions
+### Macro Definitions
 Some additional definitions are required when recreating the experiment, which are not included in the files mentioned earlier. These modifications should be made in the `VX_config.h` file:
 - `SMEM_LOG_SIZE` is set to `23` to ensure matrices fit within shared memory. This change is mandatory.
-- `LATENCY_IMUL` is set to `1` to account for the compiler's inability to detect tensor core (MMA) instruction types, preventing it from interleaving these with address calculations. While this setting is useful in some cases, it can have no impact in others.
+- `LATENCY_IMUL` is set to `1` or `2`. A lower latency here accounts for the compiler's inability to detect tensor core (MMA) instruction types, preventing it from interleaving these with address calculations, and to match ASIC target if needed. While this setting is useful in some cases, it can have no impact in others.
 
 Once these changes are made, the user must go into the `kernel` folder in the main vortex directory and rebuild the files:
 ```
@@ -68,13 +70,13 @@ make
 ```
 
 ## Validation / Reproduction
-To reproduce an experiment, as mentioned previously, you only need the defintions file and the kernel. You can use the `reproduce.py` script to automate the reproduction of experiments. For example, to reproduce results of figure 8 in paper, you can run the following while replacing the values within {} with the correct paths:
+To reproduce an experiment, as mentioned previously, you only need the definitions file and the kernel. You can use the `reproduce.py` script to automate the reproduction of experiments. For example, to reproduce results of figure 8 in paper, you can run the following while replacing the values within {} with the correct paths:
 
 ```
 python reproduce.py --source_dir {UNZIPPED_EXPERIMENT_DIR_HERE}/fig8 --output_dir {OUTPUT_DIR}/fig8
 ```
 
-Reproducing Figures 15–16 requires modifications to `py/config.json` and executing `./build_experiment.sh` with different matrices as inputs to the executable. Note that experiments with large \( K \) values may yield a slight mismatch (+/- ~1.0f) in the output due to floating-point rounding errors, which can vary depending on the NumPy version and the tensor core's rounding behavior.
+Reproducing Figures 15–16 requires manual runs and modifications to `py/config.json` and executing `./build_experiment.sh` to generate the different sized matrices as inputs to the executable. Afterward, if preferred, you can reuse the `defines.txt` file in the provided validation data for fig15-16. Note that experiments with large \( K \) values may yield a slight mismatch in the output due to floating-point rounding errors, which can vary depending on the NumPy version and the tensor core's rounding behavior.
 
 ### Notes
 #### Statistics Rate
