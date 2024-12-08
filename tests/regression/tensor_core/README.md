@@ -9,7 +9,7 @@ base/                   # Contains primitives for the tensor core programming mo
 build_experiment.sh     # Script for setting up and running experiments
 common.h
 cooperative_kernel.cpp  # Implementation for a GEMM kernel using cooperative warp execution in tensor core mode
-experiment_data.zip     # archive with experiments data
+experiments.zip     # archive with experiments data
 helper.hpp
 kernel.cpp              # Implementation for a GEMM kernel using normal tensor core execution mode
 main.cpp
@@ -39,10 +39,10 @@ Two modes of Tensor Core execution are discussed in the paper:
 
 ## Experiment Data
 
-All experiment data, including the results used to generate plots in the paper, can be found in the `experiment.zip` file. This archive contains folders named after the corresponding figure numbers in the paper.
+All experiment data, including the results used to generate plots in the paper, can be found in the `experiments.zip` file. This archive contains folders named after the corresponding figure numbers in the paper.
 
 ### Folder Contents
-Each folder contains subdirectories named according to experiment configurations:
+Each figure's folder contains subdirectories named according to experiment configurations:
 - **Examples**:
   - `th16`: Configurations with 16 threads ($NT$).
   - `wg2`: Configurations with work group sizes of 2 ($WG$).
@@ -61,7 +61,7 @@ Within each experiment subdirectory, you will find the following files:
 ### Macro Definitions
 Some additional definitions are required when recreating the experiment, which are not included in the files mentioned earlier. These modifications should be made in the `VX_config.h` file:
 - `SMEM_LOG_SIZE` is set to `23` to ensure matrices fit within shared memory. This change is mandatory.
-- `LATENCY_IMUL` is set to `1` or `2`. A lower latency here accounts for the compiler's inability to detect tensor core (MMA) instruction types, preventing it from interleaving these with address calculations, and to match ASIC target if needed. While this setting is useful in some cases, it can have no impact in others.
+- `LATENCY_IMUL` is set to `1` or `2`. A lower latency here can cover for the compiler's inability to detect tensor core (MMA) instruction types, preventing it from interleaving these with address calculations, and to match ASIC target if needed. While this setting is useful in some cases, it can have no impact in others.
 
 Once these changes are made, the user must go into the `kernel` folder in the main vortex directory and rebuild the files:
 ```
