@@ -92,7 +92,7 @@ To determine speedup, the `cycles` metric is used. Speedup is calculated by norm
 
 
 **Tensor Core Utilization Calculation**  
-The average tensor core utilization is derived from the `mac_fire` statistic, which increments every cycle the tensor core performs a computation. This data is sampled during the run and recorded in the `statistics.txt` file. 
+The average tensor core utilization is derived from the `mac_fire` statistic, which increments every cycle the tensor core fires a computation. This data is sampled during the run and recorded in the `statistics.txt` file. 
 
 To compute average utilization, the mean of the `mac_fire` values is first calculated across all samples (reported as `mac_fire_mean` in the `combined_info.csv` files). Then, this mean value is normalized by dividing it by the corresponding sampling period (refer to the section above for details on determining the sampling period). After normalization, the average tensor core utilization is then obtained as a value between 0 to 1. 
 
