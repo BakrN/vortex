@@ -2,6 +2,8 @@
 
 # Tested on podman version 4.9.4-rhel
 
+set -e
+
 show_usage()
 {
     echo "Docker Image Builder v1.0"
@@ -28,7 +30,7 @@ else
 fi
 
 # Create the container
-$DOCKER build -t $IMAGE_NAME -f $DOCKERFILE --build-arg VORTEX_ROOT=./vortex-HPCA $VORTEX_ROOT/..
+$DOCKER build -t $IMAGE_NAME -f $DOCKERFILE --no-cache --build-arg VORTEX_ROOT=./vortex $VORTEX_ROOT/..
 
 # Compile Vortex libs
-$DOCKER run --rm -v=$VORTEX_ROOT:/vortex $IMAGE_NAME make -C /vortex
+$DOCKER run --rm -v=$VORTEX_ROOT:/vortex $IMAGE_NAME /bin/bash -l -c "make -C /vortex"

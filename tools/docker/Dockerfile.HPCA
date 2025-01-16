@@ -19,13 +19,13 @@ RUN ./ci/toolchain_install.sh --all
 WORKDIR ..
 RUN rm -rf ./vortex
 
-RUN echo "export VERILATOR_ROOT='/opt/verilator/'" >> ~/.bashrc
-RUN echo "export RISCV_TOOLCHAIN_PATH=/opt/riscv-gnu-toolchain" >> ~/.bashrc
-RUN echo "export LLVM_POCL=/opt/llvm-pocl" >> ~/.bashrc
-RUN echo "export LLVM_VORTEX=/opt/llvm-vortex" >> ~/.bashrc
-RUN echo "export SV2V_PATH=/opt/sv2v" >> ~/.bashrc
-RUN echo "export YOSYS_PATH=/opt/yosys" >> ~/.bashrc
-RUN echo "export PATH='/opt/yosys:/opt/sv2v:/opt/verilator/bin:${PATH}'" >> ~/.bashrc
-RUN echo "export POCL_CC_PATH=/opt/pocl/compiler" >> ~/.bashrc
-RUN echo "export POCL_RT_PATH=/opt/pocl/runtime" >> ~/.bashrc
-RUN echo "alias python=python3" >> ~/.bashrc
+RUN echo "export VERILATOR_ROOT='/opt/verilator/'" >> ~/.profile
+RUN echo "export RISCV_TOOLCHAIN_PATH=/opt/riscv-gnu-toolchain" >> ~/.profile
+RUN echo "export LLVM_POCL=/opt/llvm-pocl" >> ~/.profile
+RUN echo "export LLVM_VORTEX=/opt/llvm-vortex" >> ~/.profile
+RUN echo "export SV2V_PATH=/opt/sv2v" >> ~/.profile
+RUN echo "export YOSYS_PATH=/opt/yosys" >> ~/.profile
+RUN echo "export PATH='/opt/yosys:/opt/sv2v:/opt/verilator/bin:${PATH}'" >> ~/.profile
+RUN echo "export POCL_CC_PATH=/opt/pocl/compiler" >> ~/.profile
+RUN echo "export POCL_RT_PATH=/opt/pocl/runtime" >> ~/.profile
+RUN echo "alias python=python3" >> ~/.profile
