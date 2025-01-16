@@ -29,3 +29,6 @@ fi
 
 # Create the container
 $DOCKER build -t $IMAGE_NAME -f $DOCKERFILE --build-arg VORTEX_ROOT=./vortex-HPCA $VORTEX_ROOT/..
+
+# Compile Vortex libs
+$DOCKER run --rm -v=$VORTEX_ROOT:/vortex $IMAGE_NAME make -C /vortex

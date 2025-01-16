@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Install dependencies
 RUN apt-get update
 # RUN apt-get -y install build-essential wget vim libtinfo5 pip libboost-all-dev libopenblas-dev
-RUN apt-get -y install build-essential clang wget git libtinfo5 pip libboost-all-dev libopenblas-dev
+RUN apt-get -y install build-essential clang wget git libtinfo5 pip uuid-dev libboost-all-dev libopenblas-dev
 RUN pip install numpy
 RUN mkdir /vortex
 
