@@ -18,7 +18,7 @@ parser.add_argument('--d_orientation', type=str, default='row_major', choices=['
 parser.add_argument('--generate_gemm', help="generate a new gemm", action='store_false')
 
 # Vortex configurtion
-parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of threads in system')
+parser.add_argument('--num_threads', '-t', type=int, default=4,help='Number of threads per warp')
 parser.add_argument('--num_warps', '-w', type=int, default=1, help='Number of warps')
 parser.add_argument('--num_cores', '-c', type=int, default=1, help='Number of cores')
 parser.add_argument('--num_clusters',  type=int, default=1, help='number of clusters')
@@ -27,17 +27,17 @@ parser.add_argument('--issue_width',  type=int, default=4, help='Issue width')
 # Tensor Core Configuration
 parser.add_argument('--input_mat_buf_depth', type=int, default=1, help='input elastic buffer depth')
 parser.add_argument('--output_fifo_size', type=int, default=1, help='output elastic buffer depth')
-parser.add_argument('--num_dot_units', type=int, default=1, help='Number of transprecision FP32 MAC units')
+parser.add_argument('--num_dot_units', type=int, default=1, help='Number of transprecision FP32 MAC units (DP_len)')
 
 parser.add_argument('--mul_lat', type=int, default=3, help='Multiplier latency')
 parser.add_argument('--add_lat', type=int, default=2, help='Adder latency')
 
 # Kernel configuration
 
-parser.add_argument('--A_ROWS', type=int, default=1, help='Outer product A rows')
-parser.add_argument('--B_COLS', type=int, default=1, help='Outer product B cols')
-parser.add_argument('--K_MULTIPLE', type=int, default=1, help='Hide latency using k multiple')
-parser.add_argument('--warp_group_size', type=int, default=0, help='Warp group size')
+parser.add_argument('--A_ROWS', type=int, default=1, help='Outer product A rows (A_loads)')
+parser.add_argument('--B_COLS', type=int, default=1, help='Outer product B cols (B_loads)')
+parser.add_argument('--K_MULTIPLE', type=int, default=1, help='Determines number of unit tiles per warp per load call')
+parser.add_argument('--warp_group_size', type=int, default=0, help='Warp group size (WG)')
 parser.add_argument('--define_file', type=str, help="File definition", default="defines.txt")
 
 

@@ -1,6 +1,27 @@
 [![Build Status](https://travis-ci.com/vortexgpgpu/vortex.svg?branch=master)](https://travis-ci.com/vortexgpgpu/vortex)
 [![codecov](https://codecov.io/gh/vortexgpgpu/vortex/branch/master/graph/badge.svg)](https://codecov.io/gh/vortexgpgpu/vortex)
 
+
+## Setting Up the Vortex Platform using Docker
+
+To run the experiments, you need to set up the Vortex platform. Please refer to the instructions after this section on how to set up the platform if you're **NOT** going to use docker. Alternatively, you can build and use the Vortex Docker image by following these instructions:
+
+After cloning this repository, you can build the Vortex Docker image by running the following command:
+
+```
+cd vortex
+./tools/docker/build_image.sh
+```
+
+Note that you should start from a clean cloned repository to avoid any issues with the build process. Be sure to include the `--recursive` flag when cloning. After the image is built, you can run the Vortex Docker container by executing the following command:
+
+```
+./tools/docker/run_container.sh
+```
+
+The Vortex repository will be mounted in the `/vortex` directory of the container. At this point, you can proceed to the `tests/regression/tensor_core` directory for further information on setting up running experiments using the tensor core. 
+
+
 # Vortex GPGPU
 
 Vortex is a full-stack open-source RISC-V GPGPU.
@@ -34,8 +55,11 @@ Vortex is a full-stack open-source RISC-V GPGPU.
 
 ## Build Instructions
 ### Supported OS Platforms
-- Ubuntu 18.04
+- Ubuntu (18/20/22).04
 - Centos 7
+
+Important note if you're using Ubuntu 18.04 or Centos7:  you must modify the `ci/toolchain_install.sh` and replace the all `focal` word instance with `bionic` or `centos/7`, respectively. 
+
 ### Toolchain Dependencies
 - [POCL](http://portablecl.org/)
 - [LLVM](https://llvm.org/)
