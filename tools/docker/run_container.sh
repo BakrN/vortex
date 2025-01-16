@@ -18,4 +18,4 @@ else
     exit 1
 fi
 
-$DOCKER run -v=$VORTEX_ROOT:/vx -it vortex:HPCA
+$DOCKER run -v=$VORTEX_ROOT:/vortex -it vortex:HPCA

@@ -20,6 +20,31 @@ py/                     # Contains configuration and utility scripts
 
 # Experiment Validation: Setup and Workflow
 
+## Setup the Vortex platform
+
+To run the experiments, you need to set up the Vortex platform. 
+Please refer to the [Vortex README](../../../README.md) for instructions on how to set up the platform.
+
+In alternative, you can build and use the Vortex Docker image by following the instructions below.
+After cloning this repository, you can build the Vortex Docker image by running the following command:
+
+```
+cd vortex
+./tools/docker/build_image.sh
+```
+
+Note that you should start from a clean cloned repository to avoid any issues with the build process.
+
+After the image is built, you can run the Vortex Docker container by executing the following command:
+
+```
+./tools/docker/run_container.sh
+```
+
+and proceed with the instructions below. The Vortex repository will be mounted in the `/vortex` directory of the container.
+
+
+
 ## Running Experiments
 
 The `build_experiment.sh` script in this directory is a bash script for running experiments. You can configure experiments by providing the `py/config.json` file as input to `py/config.py`. Alternatively, you can directly modify the `config.py` file or run experiments independently, but in such cases, ensure the necessary definitions are generated accordingly.
