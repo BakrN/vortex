@@ -306,7 +306,8 @@ module tc_top (
     assign flush_dst_reg = flush_data_out[0+:$bits(flush_dst_reg)] ;
     assign flush_src_reg = flush_data_out[$bits(flush_dst_reg)+:$bits(flush_src_reg)] ;
     assign flush_wid = flush_data_out[$bits(flush_data_out)-1-:$clog2(`NUM_WARPS)];
-    assign flush_addr = (flush_wid  >> $clog2(`NUM_TILE_BUFS)) * `NUM_TILE_REGS + flush_src_reg;
+    assign flush_addr = `NUM_TILE_BUFS==1 ? flush_src_reg : ((flush_wid  >> $clog2(`NUM_WARPS/`NUM_TILE_BUFS)) * `NUM_TILE_REGS + flush_src_reg);
+
 
 
     //////////////////////////////////////////////
